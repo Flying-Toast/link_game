@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Invitation From <%s inviter_caseid></title>
+	</head>
+	<body>
+		TODO:FULLNAME (<%s inviter_caseid>) invited you.
+	</body>
+</html>

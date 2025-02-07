@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Login Required</title>
+	</head>
+	<body>
+		<p>You must be logged in to view this page.</p>
+		<p>Please <a href="/login">Log in</a>.</p>
+	</body>
+</html>

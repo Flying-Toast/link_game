@@ -1,0 +1,5 @@
+/main
+/tmplc
+*.o
+*.sqlite3
+*.gen
