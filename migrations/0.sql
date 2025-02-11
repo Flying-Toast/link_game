@@ -1,9 +1,15 @@
+PRAGMA foreign_keys=ON;
+
 CREATE TABLE user (
+	rowid INTEGER PRIMARY KEY ASC,
 	caseid TEXT NOT NULL,
 	join_time INTEGER NOT NULL,
-	refcode TEXT NOT NULL
+	refcode TEXT NOT NULL,
+	inviter INTEGER NOT NULL,
+
+	FOREIGN KEY (inviter) REFERENCES user (rowid)
 );
-INSERT INTO user (caseid, join_time, refcode) VALUES ('srs266', 1739061402, '8f7bc7014d00c0d0');
+INSERT INTO user (caseid, join_time, refcode, inviter) VALUES ('srs266', 1739061402, '8f7bc7014d00c0d0', 1);
 
 CREATE TABLE session (
 	secret INTEGER NOT NULL UNIQUE,
