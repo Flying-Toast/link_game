@@ -195,49 +195,52 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	render_html(res, index, 0);
 }
 
+static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
+	sqlite3_stmt *q = NULL;
+	int64_t uid;
+	sql_prepare_v2(
+		db,
+		"SELECT rowid FROM user\n"
+		"JOIN session ON session.caseid = user.caseid\n"
+		"WHERE session.secret = ?;",
+		-1,
+		&q,
+		NULL
+	);
+	sql_bind_int64(q, 1, sid);
+
+	int e = sqlite3_step(q);
+	if (e == SQLITE_ROW) {
+		uid = sqlite3_column_int64(q, 0);
+	} else {
+		if (e != SQLITE_DONE)
+			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+		uid = 0;
+	}
+	sqlite3_finalize(q);
+	return uid;
+}
+
 static enum filter_flow require_account(struct request *req, struct response *res, sqlite3 *db) {
 	(void)db;
-	sqlite3_stmt *uidq = NULL;
 	char *sid_str = request_get_cookie(req, "s");
-	enum filter_flow ret;
 	if (sid_str == NULL || *sid_str == '\0') {
 		response_set_cookie(res, "return", req->uri);
 		render_html(res, login_prompt, 0);
-		ret = FILTER_HALT;
-		goto out;
-	} else {
-		char *endptr;
-		int64_t sid = strtol(sid_str, &endptr, 16);
-		assert(*endptr == 0);
-		int e;
-
-		sql_prepare_v2(
-			db,
-			"SELECT rowid FROM user\n"
-			"JOIN session ON session.caseid = user.caseid\n"
-			"WHERE session.secret = ?;",
-			-1,
-			&uidq,
-			NULL
-		);
-		sql_bind_int64(uidq, 1, sid);
-
-		e = sqlite3_step(uidq);
-		if (e == SQLITE_ROW) {
-			req->uid = sqlite3_column_int64(uidq, 0);
-			ret = FILTER_CONTINUE;
-		} else {
-			if (e != SQLITE_DONE)
-				errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
-			response_delete_cookie(res, "s");
-			redirect(res, "/");
-			ret = FILTER_HALT;
-		}
+		return FILTER_HALT;
 	}
 
-out:
-	sqlite3_finalize(uidq);
-	return ret;
+	char *endptr;
+	int64_t sid = strtol(sid_str, &endptr, 16);
+	assert(*endptr == 0);
+
+	if ((req->uid = uid_from_sid(db, sid)) != 0) {
+		return FILTER_CONTINUE;
+	} else {
+		response_delete_cookie(res, "s");
+		redirect(res, "/");
+		return FILTER_HALT;
+	}
 }
 
 static void invite_handler(struct request *req, struct response *res, sqlite3 *db) {
