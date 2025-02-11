@@ -2,7 +2,8 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<title>Invitation From <%s inviter_caseid></title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Welcome to LinkChain</title>
 	</head>
 	<body>
 		TODO:FULLNAME (<%s inviter_caseid>) invited you.
