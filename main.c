@@ -221,18 +221,26 @@ static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
 	return uid;
 }
 
+static int64_t getsid(struct request *req) {
+	char *sid_str = request_get_cookie(req, "s");
+	if (sid_str == NULL || *sid_str == '\0')
+		return -1;
+
+	char *endptr;
+	int64_t sid = strtol(sid_str, &endptr, 16);
+	if (*endptr != '\0')
+		return -1;
+	return sid;
+}
+
 static enum filter_flow require_account(struct request *req, struct response *res, sqlite3 *db) {
 	(void)db;
-	char *sid_str = request_get_cookie(req, "s");
-	if (sid_str == NULL || *sid_str == '\0') {
+	int64_t sid = getsid(req);
+	if (sid == -1) {
 		response_set_cookie(res, "return", req->uri);
 		render_html(res, login_prompt, 0);
 		return FILTER_HALT;
 	}
-
-	char *endptr;
-	int64_t sid = strtol(sid_str, &endptr, 16);
-	assert(*endptr == 0);
 
 	if ((req->uid = uid_from_sid(db, sid)) != 0) {
 		return FILTER_CONTINUE;
@@ -248,6 +256,12 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	int e;
 	sqlite3_stmt *invq = NULL;
 	const char *inviter_caseid = NULL;
+
+	// check if user already exists
+	if (uid_from_sid(db, getsid(req)) != 0) {
+		render_html(res, already_joined, 0);
+		goto out;
+	}
 
 	const char *refcode = request_get_segment(req, "refcode");
 	sql_prepare_v2(
