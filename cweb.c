@@ -542,7 +542,7 @@ void response_set_status(struct response *res, enum status_code status) {
 
 void response_set_cookie(struct response *res, char *name, char *value) {
 	char val[4096];
-	int nwrite = snprintf(val, sizeof(val), "%s=%s; Max-Age=2592000", name, value);
+	int nwrite = snprintf(val, sizeof(val), "%s=%s; Max-Age=2592000; Path=/", name, value);
 	if (nwrite == sizeof(val) - 1) {
 		fprintf(stderr, "Cookie \"%s=%s\" too big! Ignoring...\n", name, value);
 		return;

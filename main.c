@@ -273,6 +273,7 @@ static void create_user(
 	sql_bind_int64(s, 1, inviter_uid);
 	sql_bind_text(s, 2, refcodebuf, refcodelen);
 	sql_bind_int64(s, 3, join_time);
+	sql_bind_int64(s, 4, current_sid);
 	if (sqlite3_step(s) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
