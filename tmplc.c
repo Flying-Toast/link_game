@@ -108,7 +108,7 @@ static void print_strlit(const char *ptr, size_t len) {
 static void append_arg(str_t spec, str_t name) {
 	if (strncmp("s", spec.ptr, spec.len) == 0) {
 		printf(
-			"\tresponse_append_html_escaped(res, args->%.*s);\n"
+			"\tcweb_append_html_escaped(res, args->%.*s);\n"
 			,(int)name.len
 			,name.ptr
 		);
@@ -123,7 +123,7 @@ static void append_arg(str_t spec, str_t name) {
 			,name.ptr
 		);
 		printf("\t\tassert((size_t)nwrite < sizeof(buf));\n");
-		printf("\t\tresponse_append(res, buf, nwrite);\n");
+		printf("\t\tcweb_append(res, buf, nwrite);\n");
 		printf("\t}\n");
 	}
 }
@@ -179,7 +179,7 @@ static void do_func(const char *basename, char *buf) {
 		const char *runstart = buf;
 		buf += next_placeholder(buf);
 
-		printf("\tresponse_append_lit(res, ");
+		printf("\tcweb_append_lit(res, ");
 		print_strlit(runstart, buf - runstart);
 		printf(");\n");
 

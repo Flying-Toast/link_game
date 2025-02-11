@@ -14,9 +14,6 @@
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-void not_found(struct response *res);
-void bad_request(struct response *res);
-
 struct route {
 	struct route_spec *spec;
 	size_t n_segments;
@@ -345,9 +342,9 @@ static void handle(int fd, struct route *routes, size_t n_routes, sqlite3 *db) {
 	char buf[4096];
 	ssize_t nread = recv_until_rnrn(fd, buf, sizeof(buf));
 	if (nread == -1) {
-		response_set_status(&res, STATUS_BAD_REQUEST);
-		response_add_header(&res, "Content-Type", "text/plain");
-		response_append_lit(&res, "Request Too Large");
+		cweb_set_status(&res, STATUS_BAD_REQUEST);
+		cweb_add_header(&res, "Content-Type", "text/plain");
+		cweb_append_lit(&res, "Request Too Large");
 
 		respond(fd, &res);
 		return;
@@ -486,15 +483,15 @@ void cweb_run(struct cweb_args *args) {
 	}
 }
 
-char *request_get_query(struct request *req, char *name) {
+char *cweb_get_query(struct request *req, char *name) {
 	return kvlist_get(&req->params, name);
 }
 
-char *request_get_segment(struct request *req, char *name) {
+char *cweb_get_segment(struct request *req, char *name) {
 	return kvlist_get(&req->named_segments, name);
 }
 
-void response_append(struct response *res, const char *stuff, size_t len) {
+void cweb_append(struct response *res, const char *stuff, size_t len) {
 	if (len == 0)
 		return;
 	res->body = realloc(res->body, res->body_len + len);
@@ -502,87 +499,87 @@ void response_append(struct response *res, const char *stuff, size_t len) {
 	res->body_len += len;
 }
 
-void response_append_html_escaped(struct response *res, const char *s) {
+void cweb_append_html_escaped(struct response *res, const char *s) {
 	while (*s) {
 		const char *runstart = s;
 		while (*s && *s != '&' && *s != '<' && *s != '>' && *s != '"' && *s != '\'')
 			s++;
-		response_append(res, runstart, s - runstart);
+		cweb_append(res, runstart, s - runstart);
 		if (*s == '\0')
 			break;
 		switch (*(s++)) {
 		case '&':
-			response_append_lit(res, "&amp;");
+			cweb_append_lit(res, "&amp;");
 			break;
 		case '<':
-			response_append_lit(res, "&lt;");
+			cweb_append_lit(res, "&lt;");
 			break;
 		case '>':
-			response_append_lit(res, "&gt;");
+			cweb_append_lit(res, "&gt;");
 			break;
 		case '"':
-			response_append_lit(res, "&#034;");
+			cweb_append_lit(res, "&#034;");
 			break;
 		case '\'':
-			response_append_lit(res, "&#039;");
+			cweb_append_lit(res, "&#039;");
 			break;
 		}
 	}
 }
 
-void response_add_header(struct response *res, char *name, char *value) {
+void cweb_add_header(struct response *res, char *name, char *value) {
 	struct kv *new = kvlist_extend(&res->headers);
 	new->name = strdup(name);
 	new->value = strdup(value);
 }
 
-void response_set_status(struct response *res, enum status_code status) {
+void cweb_set_status(struct response *res, enum status_code status) {
 	res->status = status;
 }
 
-void response_set_cookie(struct response *res, char *name, char *value) {
+void cweb_set_cookie(struct response *res, char *name, char *value) {
 	char val[4096];
 	int nwrite = snprintf(val, sizeof(val), "%s=%s; Max-Age=2592000; Path=/", name, value);
 	if (nwrite == sizeof(val) - 1) {
 		fprintf(stderr, "Cookie \"%s=%s\" too big! Ignoring...\n", name, value);
 		return;
 	}
-	response_add_header(res, "Set-Cookie", val);
+	cweb_add_header(res, "Set-Cookie", val);
 }
 
-void response_delete_cookie(struct response *res, char *name) {
+void cweb_delete_cookie(struct response *res, char *name) {
 	char val[4096];
 	int nwrite = snprintf(val, sizeof(val), "%s=x; Max-Age=-1", name);
 	if (nwrite == sizeof(val) - 1) {
 		fprintf(stderr, "Header to delete cookie \"%s\" too big!", name);
 		return;
 	}
-	response_add_header(res, "Set-Cookie", val);
+	cweb_add_header(res, "Set-Cookie", val);
 }
 
-char *request_get_cookie(struct request *req, char *name) {
+char *cweb_get_cookie(struct request *req, char *name) {
 	return kvlist_get(&req->cookies, name);
 }
 
 void not_found(struct response *res) {
-	response_set_status(res, STATUS_NOT_FOUND);
-	response_add_header(res, "Content-Type", "text/plain");
-	response_append_lit(res, "Not Found");
+	cweb_set_status(res, STATUS_NOT_FOUND);
+	cweb_add_header(res, "Content-Type", "text/plain");
+	cweb_append_lit(res, "Not Found");
 }
 
 void bad_request(struct response *res) {
-	response_set_status(res, STATUS_BAD_REQUEST);
-	response_add_header(res, "Content-Type", "text/plain");
-	response_append_lit(res, "Bad Request");
+	cweb_set_status(res, STATUS_BAD_REQUEST);
+	cweb_add_header(res, "Content-Type", "text/plain");
+	cweb_append_lit(res, "Bad Request");
 }
 
 void server_error(struct response *res) {
-	response_set_status(res, STATUS_SERVER_ERROR);
-	response_add_header(res, "Content-Type", "text/plain");
-	response_append_lit(res, "Internal Server Error");
+	cweb_set_status(res, STATUS_SERVER_ERROR);
+	cweb_add_header(res, "Content-Type", "text/plain");
+	cweb_append_lit(res, "Internal Server Error");
 }
 
 void redirect(struct response *res, char *to) {
-	response_set_status(res, STATUS_FOUND);
-	response_add_header(res, "Location", to);
+	cweb_set_status(res, STATUS_FOUND);
+	cweb_add_header(res, "Location", to);
 }

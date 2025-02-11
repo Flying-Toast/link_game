@@ -5,19 +5,13 @@
 #include <stddef.h>
 #include "sqlite3.h"
 
-#define response_append_lit(res, lit) response_append(res, ""lit"", sizeof(lit) - 1)
+#define cweb_append_lit(res, lit) cweb_append(res, ""lit"", sizeof(lit) - 1)
 
 #define FILTERS(...) (filter_func_t[]){ __VA_ARGS__, NULL }
 
-#define WITH_FILTER(filt, req, res, db) \
-	do { \
-		if (filt(req, res, db) == FILTER_HALT) \
-			return FILTER_HALT; \
-	} while (0)
-
 #define render_html(res, basename, ...) \
 	do { \
-		response_add_header(res, "Content-Type", "text/html"); \
+		cweb_add_header(res, "Content-Type", "text/html"); \
 		__tmplfunc_##basename(res, &(struct __tmplargs_##basename){__VA_ARGS__}); \
 	} while (0)
 
@@ -89,16 +83,16 @@ struct cweb_args {
 
 void cweb_run(struct cweb_args *args);
 
-char *request_get_query(struct request *req, char *name);
-char *request_get_segment(struct request *req, char *name);
-char *request_get_cookie(struct request *req, char *name);
+char *cweb_get_query(struct request *req, char *name);
+char *cweb_get_segment(struct request *req, char *name);
+char *cweb_get_cookie(struct request *req, char *name);
 
-void response_add_header(struct response *res, char *name, char *value);
-void response_set_status(struct response *res, enum status_code status);
-void response_append(struct response *res, const char *stuff, size_t len);
-void response_append_html_escaped(struct response *res, const char *s);
-void response_set_cookie(struct response *res, char *name, char *value);
-void response_delete_cookie(struct response *res, char *name);
+void cweb_add_header(struct response *res, char *name, char *value);
+void cweb_set_status(struct response *res, enum status_code status);
+void cweb_append(struct response *res, const char *stuff, size_t len);
+void cweb_append_html_escaped(struct response *res, const char *s);
+void cweb_set_cookie(struct response *res, char *name, char *value);
+void cweb_delete_cookie(struct response *res, char *name);
 
 void not_found(struct response *res);
 void bad_request(struct response *res);
