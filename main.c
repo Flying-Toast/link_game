@@ -247,8 +247,7 @@ static enum filter_flow require_account(struct request *req, struct response *re
 	if ((req->uid = uid_from_sid(db, sid)) != 0) {
 		return FILTER_CONTINUE;
 	} else {
-		cweb_delete_cookie(res, STR("s"));
-		redirect(res, STR("/"));
+		render_html(res, account_needed, 0);
 		return FILTER_HALT;
 	}
 }
@@ -324,7 +323,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		);
 	} else {
 		create_user(db, inviter_uid, sid);
-		cweb_append(res, STR("Welcome..."));
+		redirect(res, STR("/welcome"));
 	}
 
 out:
