@@ -96,12 +96,16 @@ size_t auth_validate_write_callback(char *newdata, size_t size, size_t nmemb, st
 	return nmemb;
 }
 
+static int64_t random_positive_int64(void) {
+	int64_t r;
+	arc4random_buf(&r, sizeof(r));
+	if (r == INT64_MIN)
+		r++;
+	return labs(r);
+}
+
 static int64_t gen_session(sqlite3 *db, char *caseid) {
-	int64_t sid;
-	arc4random_buf(&sid, sizeof(sid));
-	if (sid == INT64_MIN)
-		sid++;
-	sid = llabs(sid);
+	int64_t sid = random_positive_int64();
 	sqlite3_stmt *del = NULL;
 	sqlite3_stmt *ins = NULL;
 
@@ -193,16 +197,47 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 
 static enum filter_flow require_account(struct request *req, struct response *res, sqlite3 *db) {
 	(void)db;
+	sqlite3_stmt *uidq = NULL;
 	char *sid_str = request_get_cookie(req, "s");
+	enum filter_flow ret;
 	if (sid_str == NULL || *sid_str == '\0') {
 		response_set_cookie(res, "return", req->uri);
 		render_html(res, login_prompt, 0);
-		return FILTER_HALT;
+		ret = FILTER_HALT;
+		goto out;
 	} else {
-		// TODO: VALidate account
-		fprintf(stderr,"TODO:validate account\n");
-		return FILTER_CONTINUE;
+		char *endptr;
+		int64_t sid = strtol(sid_str, &endptr, 16);
+		assert(*endptr == 0);
+		int e;
+
+		sql_prepare_v2(
+			db,
+			"SELECT rowid FROM user\n"
+			"JOIN session ON session.caseid = user.caseid\n"
+			"WHERE session.secret = ?;",
+			-1,
+			&uidq,
+			NULL
+		);
+		sql_bind_int64(uidq, 1, sid);
+
+		e = sqlite3_step(uidq);
+		if (e == SQLITE_ROW) {
+			req->uid = sqlite3_column_int64(uidq, 0);
+			ret = FILTER_CONTINUE;
+		} else {
+			if (e != SQLITE_DONE)
+				errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+			response_delete_cookie(res, "s");
+			redirect(res, "/");
+			ret = FILTER_HALT;
+		}
 	}
+
+out:
+	sqlite3_finalize(uidq);
+	return ret;
 }
 
 static void invite_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -222,7 +257,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	sql_bind_text(invq, 1, refcode, -1);
 	e = sqlite3_step(invq);
 	if (e == SQLITE_ROW) {
-		inviter_caseid = sqlite3_column_text(invq, 0);
+		inviter_caseid = (char *)sqlite3_column_text(invq, 0);
 	} else {
 		if (e != SQLITE_DONE)
 			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -235,10 +270,6 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	response_append(res,inviter_caseid,strlen(inviter_caseid));
 	goto out;
 	//////////
-
-		//"SELECT caseid FROM user\n"
-		//"JOIN session ON session.caseid = user.caseid\n"
-		//"WHERE session.secret = ?;"
 
 	char *sid_str = request_get_cookie(req, "s");
 	if (sid_str == NULL || *sid_str == '\0') {

@@ -44,6 +44,7 @@ struct request {
 	struct kvlist params;
 	struct kvlist headers;
 	struct kvlist cookies;
+	int64_t uid;
 };
 
 enum status_code {
