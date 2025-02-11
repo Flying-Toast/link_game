@@ -1,6 +1,7 @@
 #include <curl/curl.h>
 #include <assert.h>
 #include <err.h>
+#include <time.h>
 #include <ldap.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -251,14 +252,43 @@ static enum filter_flow require_account(struct request *req, struct response *re
 	}
 }
 
+static void create_user(
+	sqlite3 *db,
+	int64_t inviter_uid,
+	int64_t current_sid
+) {
+	int64_t join_time = time(NULL);
+	char refcodebuf[100];
+	int refcodelen = snprintf(refcodebuf, sizeof(refcodebuf), "%"PRIx64, random_positive_int64());
+
+	sqlite3_stmt *s;
+	sql_prepare_v2(
+		db,
+		"INSERT INTO user (inviter, refcode, join_time, caseid)\n"
+		"VALUES (?,?,?, (SELECT caseid FROM session WHERE secret = ?));",
+		-1,
+		&s,
+		NULL
+	);
+	sql_bind_int64(s, 1, inviter_uid);
+	sql_bind_text(s, 2, refcodebuf, refcodelen);
+	sql_bind_int64(s, 3, join_time);
+	if (sqlite3_step(s) != SQLITE_DONE)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	sqlite3_finalize(s);
+}
+
 static void invite_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
 	int e;
 	sqlite3_stmt *invq = NULL;
 	const char *inviter_caseid = NULL;
+	int64_t inviter_uid;
 
 	// check if user already exists
-	if (uid_from_sid(db, getsid(req)) != 0) {
+	int64_t sid = getsid(req);
+	if (sid != -1 && uid_from_sid(db, sid) != 0) {
 		render_html(res, already_joined, 0);
 		goto out;
 	}
@@ -266,7 +296,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	const char *refcode = request_get_segment(req, "refcode");
 	sql_prepare_v2(
 		db,
-		"SELECT caseid FROM user WHERE refcode = ?;",
+		"SELECT caseid, rowid FROM user WHERE refcode = ?;",
 		-1,
 		&invq,
 		NULL
@@ -275,6 +305,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	e = sqlite3_step(invq);
 	if (e == SQLITE_ROW) {
 		inviter_caseid = (char *)sqlite3_column_text(invq, 0);
+		inviter_uid = sqlite3_column_int64(invq, 1);
 	} else {
 		if (e != SQLITE_DONE)
 			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -282,21 +313,16 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		goto out;
 	}
 
-	//////////
-	response_append_lit(res, "this is the ref link of: ");
-	response_append(res,inviter_caseid,strlen(inviter_caseid));
-	goto out;
-	//////////
-
-	char *sid_str = request_get_cookie(req, "s");
-	if (sid_str == NULL || *sid_str == '\0') {
+	if (sid == -1) {
 		response_set_cookie(res, "return", req->uri);
 		render_html(
 			res,
 			invite_login_prompt,
 			.inviter_caseid = inviter_caseid,
 		);
-		goto out;
+	} else {
+		create_user(db, inviter_uid, sid);
+		response_append_lit(res, "Welcome...");
 	}
 
 out:
