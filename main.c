@@ -80,7 +80,7 @@ out:
 
 static void login_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)db; (void)req;
-	redirect(res, "https://login.case.edu/cas/login?service="SSO_SERVICE);
+	redirect(res, STR("https://login.case.edu/cas/login?service="SSO_SERVICE));
 }
 
 struct auth_callback_userdata {
@@ -128,14 +128,14 @@ static int64_t gen_session(sqlite3 *db, char *caseid) {
 
 static void auth_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)db;
-	const char *ticket = cweb_get_query(req, "ticket");
+	const str_t *ticket = cweb_get_query(req, STR("ticket"));
 	if (!ticket) {
 		bad_request(res);
 		return;
 	}
 
 	char url[1024];
-	snprintf(url, sizeof(url), "https://login.case.edu/cas/validate?ticket=%s&service="SSO_SERVICE, ticket);
+	snprintf(url, sizeof(url), "https://login.case.edu/cas/validate?ticket=%.*s&service="SSO_SERVICE, PRSTR(*ticket));
 
 	CURL *c = curl_easy_init();
 	struct auth_callback_userdata output = {0};
@@ -165,19 +165,20 @@ static void auth_handler(struct request *req, struct response *res, sqlite3 *db)
 
 		int64_t key = gen_session(db, caseid);
 		char sbuf[1024];
-		snprintf(sbuf, sizeof(sbuf), "%"PRIx64, key);
-		cweb_set_cookie(res, "s", sbuf);
+		int nwrite = snprintf(sbuf, sizeof(sbuf), "%"PRIx64, key);
+		str_t sstr = { .ptr = sbuf, .len = nwrite };
+		cweb_set_cookie(res, STR("s"), sstr);
 
-		char *return_url = cweb_get_cookie(req, "return");
+		const str_t *return_url = cweb_get_cookie(req, STR("return"));
 		if (return_url) {
-			redirect(res, return_url);
-			cweb_delete_cookie(res, "return");
+			redirect(res, *return_url);
+			cweb_delete_cookie(res, STR("return"));
 		} else {
-			redirect(res, "/");
+			redirect(res, STR("/"));
 		}
 	} else {
-		cweb_add_header(res, "Content-Type", "text/plain");
-		cweb_append_lit(res, "Login failed. Please try again.");
+		cweb_add_header(res, STR("Content-Type"), STR("text/plain"));
+		cweb_append(res, STR("Login failed. Please try again."));
 	}
 
 out:
@@ -187,8 +188,8 @@ out:
 
 static void logout_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
-	cweb_delete_cookie(res, "s");
-	redirect(res, "/");
+	cweb_delete_cookie(res, STR("s"));
+	redirect(res, STR("/"));
 }
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -223,13 +224,13 @@ static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
 }
 
 static int64_t getsid(struct request *req) {
-	char *sid_str = cweb_get_cookie(req, "s");
-	if (sid_str == NULL || *sid_str == '\0')
+	const str_t *sid_str = cweb_get_cookie(req, STR("s"));
+	if (sid_str == NULL || sid_str->len == 0)
 		return -1;
 
-	char *endptr;
-	int64_t sid = strtol(sid_str, &endptr, 16);
-	if (*endptr != '\0')
+	bool ok;
+	int64_t sid = str_toi64(*sid_str, &ok, 16);
+	if (!ok)
 		return -1;
 	return sid;
 }
@@ -238,7 +239,7 @@ static enum filter_flow require_account(struct request *req, struct response *re
 	(void)db;
 	int64_t sid = getsid(req);
 	if (sid == -1) {
-		cweb_set_cookie(res, "return", req->uri);
+		cweb_set_cookie(res, STR("return"), req->uri);
 		render_html(res, login_prompt, 0);
 		return FILTER_HALT;
 	}
@@ -246,8 +247,8 @@ static enum filter_flow require_account(struct request *req, struct response *re
 	if ((req->uid = uid_from_sid(db, sid)) != 0) {
 		return FILTER_CONTINUE;
 	} else {
-		cweb_delete_cookie(res, "s");
-		redirect(res, "/");
+		cweb_delete_cookie(res, STR("s"));
+		redirect(res, STR("/"));
 		return FILTER_HALT;
 	}
 }
@@ -284,7 +285,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	(void)req; (void)db;
 	int e;
 	sqlite3_stmt *invq = NULL;
-	const char *inviter_caseid = NULL;
+	str_t inviter_caseid = {0};
 	int64_t inviter_uid;
 
 	// check if user already exists
@@ -294,7 +295,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		goto out;
 	}
 
-	const char *refcode = cweb_get_segment(req, "refcode");
+	str_t refcode = *cweb_get_segment(req, STR("refcode"));
 	sql_prepare_v2(
 		db,
 		"SELECT caseid, rowid FROM user WHERE refcode = ?;",
@@ -302,20 +303,20 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		&invq,
 		NULL
 	);
-	sql_bind_text(invq, 1, refcode, -1);
+	sql_bind_text(invq, 1, refcode.ptr, refcode.len);
 	e = sqlite3_step(invq);
 	if (e == SQLITE_ROW) {
-		inviter_caseid = (char *)sqlite3_column_text(invq, 0);
+		inviter_caseid = sql_column_str(invq, 0);
 		inviter_uid = sqlite3_column_int64(invq, 1);
 	} else {
 		if (e != SQLITE_DONE)
 			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
-		cweb_append_lit(res, "Invalid invite link");
+		cweb_append(res, STR("Invalid invite link"));
 		goto out;
 	}
 
 	if (sid == -1) {
-		cweb_set_cookie(res, "return", req->uri);
+		cweb_set_cookie(res, STR("return"), req->uri);
 		render_html(
 			res,
 			invite_login_prompt,
@@ -323,7 +324,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		);
 	} else {
 		create_user(db, inviter_uid, sid);
-		cweb_append_lit(res, "Welcome...");
+		cweb_append(res, STR("Welcome..."));
 	}
 
 out:

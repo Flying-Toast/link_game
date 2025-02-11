@@ -7,20 +7,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include "str.h"
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
-
-typedef struct {
-	char *ptr;
-	size_t len;
-} str_t;
 
 const struct {
 	const char *fmt;
 	const char *type;
 } specspecs[] = {
 	{ "d", "int " },
-	{ "s", "const char *" },
+	{ "s", "str_t " },
 };
 
 static const char *spectype(str_t fmt) {
@@ -179,9 +175,9 @@ static void do_func(const char *basename, char *buf) {
 		const char *runstart = buf;
 		buf += next_placeholder(buf);
 
-		printf("\tcweb_append_lit(res, ");
+		printf("\tcweb_append(res, STR(");
 		print_strlit(runstart, buf - runstart);
-		printf(");\n");
+		printf("));\n");
 
 		if (*buf == 0)
 			break;

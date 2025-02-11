@@ -3,8 +3,8 @@ CFLAGS=-Wall -Wextra -Wpedantic -Wno-missing-field-initializers -std=c99 -g \
        -D _POSIX_C_SOURCE=200809L -D _DEFAULT_SOURCE -fsanitize=undefined
 LIBS=-lcurl -lldap
 TEMPLATES:=views/*
-OBJECTS=cweb.o main.o
-HEADERS=cweb.h sql_wrappers.h
+OBJECTS=cweb.o main.o str.o
+HEADERS=cweb.h sql_wrappers.h str.h
 
 .PHONY: run
 run: main
@@ -17,8 +17,8 @@ main.o: tmplfuncs.gen
 main: $(OBJECTS) sqlite3.o
 	$(CC) $(CFLAGS) $(LIBS) -o main $(OBJECTS) sqlite3.o
 
-tmplc: tmplc.o
-	$(CC) $(CFLAGS) tmplc.o -o tmplc
+tmplc: tmplc.o str.o
+	$(CC) $(CFLAGS) tmplc.o str.o -o tmplc
 
 tmplfuncs.gen: $(TEMPLATES) tmplc
 	./tmplc $(TEMPLATES) >tmplfuncs.gen

@@ -3,7 +3,6 @@
 #include <ctype.h>
 #include <err.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,14 +18,14 @@ struct route {
 	size_t n_segments;
 	struct {
 		bool is_glob;
-		char *str;
+		str_t str;
 	} *segments;
 };
 
-static char *kvlist_get(struct kvlist *kvs, char *name) {
+static str_t *kvlist_get(struct kvlist *kvs, str_t name) {
 	for (size_t i = 0; i < kvs->n; i++) {
-		if (strcmp(name, kvs->l[i].name) == 0)
-			return kvs->l[i].value;
+		if (str_eq(kvs->l[i].name, name))
+			return &kvs->l[i].value;
 	}
 	return NULL;
 }
@@ -40,13 +39,6 @@ static struct kv *kvlist_extend(struct kvlist *kvs) {
 static void kvlist_init(struct kvlist *kvs) {
 	kvs->n = 0;
 	kvs->l = NULL;
-}
-
-static void makelower(char *str) {
-	while (*str) {
-		*str = tolower(*str);
-		str++;
-	}
 }
 
 /*
@@ -85,7 +77,7 @@ static void respond(int fd, struct response *res) {
 	// send headers
 	for (size_t i = 0; i < res->headers.n; i++) {
 		struct kv *h = res->headers.l + i;
-		if (dprintf(fd, "%s: %s\r\n", h->name, h->value) < 0) {
+		if (dprintf(fd, "%.*s: %.*s\r\n", PRSTR(h->name), PRSTR(h->value)) < 0) {
 			perror("dprintf");
 			return;
 		}
@@ -109,7 +101,7 @@ static bool route_matches(struct route *r, struct request *req) {
 		if (r->segments[i].is_glob)
 			continue;
 
-		if (strcmp(r->segments[i].str, req->segments[i]) != 0)
+		if (!str_eq(r->segments[i].str, req->segments[i]))
 			return false;
 	}
 
@@ -125,67 +117,85 @@ static struct route *find_route(struct route *routes, size_t n, struct request *
 	return NULL;
 }
 
-static bool segmentize(char *path, struct request *req) {
+static bool segmentize(str_t path, struct request *req) {
 	req->n_segments = 0;
 	req->segments = NULL;
 
-	if (*path != '/')
+	if (path.len == 0 || *path.ptr != '/')
 		return false;
-	path++;
+	path.len--;
+	path.ptr++;
 
-	while (*path) {
+	while (path.len) {
 		req->n_segments += 1;
 		req->segments = realloc(req->segments, sizeof(req->segments[0]) * req->n_segments);
-		req->segments[req->n_segments - 1] = path;
-		while (*path && *path != '/')
-			path++;
-		if (*path == '/') {
-			*path = '\0';
-			path++;
+
+		size_t seglen = 0;
+		const char *start = path.ptr;
+		while (path.len && *path.ptr != '/') {
+			seglen++;
+			path.ptr++;
+			path.len--;
+		}
+
+		req->segments[req->n_segments - 1].ptr = start;
+		req->segments[req->n_segments - 1].len = seglen;
+
+		if (path.len) {
+			path.ptr++;
+			path.len--;
 		}
 	}
 	return true;
 }
 
-static bool parse_uri(struct request *req, char *uri) {
-	if (*uri == '\0')
+static bool parse_uri(struct request *req, str_t uri) {
+	if (uri.len == 0)
 		return false;
 
-	char *path = uri;
-	while (*uri && *uri != '?')
-		uri++;
-	// overwrite a trailing slash
-	if (uri[-1] == '/' && uri - 1 != path)
-		uri[-1] = '\0';
-	else
-		*uri = '\0';
-	uri++;
+	str_t path = { .ptr = uri.ptr, .len = 0 };
+	while (uri.len && *uri.ptr != '?') {
+		path.len++;
+		uri.ptr++;
+		uri.len--;
+	}
+	// remove a trailing slash
+	if (path.len > 1 && path.ptr[path.len - 1] == '/')
+		path.len--;
+	// skip '?'
+	if (uri.len) {
+		uri.ptr++;
+		uri.len--;
+	}
 
-	kvlist_init(&req->params);
 	// query params
-	while (*uri) {
+	kvlist_init(&req->params);
+	while (uri.len) {
 		struct kv *q = kvlist_extend(&req->params);
 
-		q->name = uri;
-		while (*uri && *uri != '=' && *uri != '&')
-			uri++;
+		q->name.ptr = uri.ptr;
+		q->name.len = 0;
+		while (uri.len && *uri.ptr != '=' && *uri.ptr != '&') {
+			q->name.len++;
+			uri.ptr++;
+			uri.len--;
+		}
 
-		if (*uri == '=') {
-			*uri = '\0';
-			uri++;
-			q->value = uri;
-			while (*uri && *uri != '&')
-				uri++;
-			if (*uri == '&') {
-				*uri = '\0';
-				uri++;
+		q->value.len = 0;
+		if (uri.len != 0) {
+			if (*uri.ptr == '&') {
+				uri.ptr++;
+				uri.len--;
+			} else { // *uri.ptr == '='
+				uri.ptr++;
+				uri.len--;
+				q->value.ptr = uri.ptr;
+				while (uri.len && *uri.ptr != '&') {
+					q->value.len++;
+					uri.ptr++;
+					uri.len--;
+				}
 			}
-		} else if (*uri == '&') {
-			*uri = '\0';
-			uri++;
-			q->value = "";
-		} else {
-			q->value = "";
 		}
 	}
 
@@ -194,30 +204,39 @@ static bool parse_uri(struct request *req, char *uri) {
 	return true;
 }
 
-static bool parse_cookie(struct request *req, char *str) {
+static bool parse_cookie(struct request *req, str_t str) {
 	kvlist_init(&req->cookies);
 
-	while (*str) {
+	while (str.len) {
 		struct kv *new = kvlist_extend(&req->cookies);
-
-		new->name = str;
-		while (*str && *str != '=')
-			str++;
-		if (*str == 0)
+		new->name.ptr = str.ptr;
+		new->name.len = 0;
+		while (str.len && *str.ptr != '=') {
+			new->name.len++;
+			str.len--;
+			str.ptr++;
+		}
+		if (str.len == 0)
 			return false;
-		*str = 0;
-		str++;
+		str.len--;
+		str.ptr++;
 
-		new->value = str;
-		while (*str && *str != ';')
-			str++;
-		if (*str == 0)
+		new->value.ptr = str.ptr;
+		new->value.len = 0;
+		while (str.len && *str.ptr != ';') {
+			new->value.len++;
+			str.len--;
+			str.ptr++;
+		}
+		if (str.len == 0)
 			continue;
-		*str = 0;
-		str++;
+		str.len--;
+		str.ptr++;
 
-		while (*str && *str == ' ')
-			str++;
+		while (str.len && *str.ptr == ' ') {
+			str.len--;
+			str.ptr++;
+		}
 	}
 
 	return true;
@@ -234,36 +253,38 @@ static bool parse_request(struct request *req, char *buf, size_t bufsiz) {
 		return false;
 
 	// extract method
-	char *method_str = buf;
+	str_t method_str = { .ptr = buf, .len = 0 };
 	while (bufsiz && *buf != ' ') {
+		method_str.len++;
 		buf++;
 		bufsiz--;
 	}
 	if (bufsiz == 0)
 		return false;
-	*buf = '\0';
+	// skip ' ' after method
 	buf++;
 	bufsiz--;
 
-	if (strcmp("GET", method_str) == 0)
+	if (str_eqz(method_str, "GET"))
 		req->method = METHOD_GET;
 	else
 		return false;
 
 	// extract uri
-	char *uri = buf;
+	req->uri.ptr = buf;
+	req->uri.len = 0;
 	while (bufsiz && *buf != ' ') {
+		req->uri.len++;
 		buf++;
 		bufsiz--;
 	}
 	if (bufsiz == 0)
 		return false;
-	*buf = '\0';
+	// skip ' '
 	buf++;
 	bufsiz--;
 
-	req->uri = strdup(uri);
-	if (!parse_uri(req, uri))
+	if (!parse_uri(req, req->uri))
 		return false;
 
 	// skip version
@@ -284,42 +305,42 @@ static bool parse_request(struct request *req, char *buf, size_t bufsiz) {
 		if (buf[0] == '\r' && buf[1] == '\n')
 			break;
 
-		char *name = buf;
+		str_t name = { .ptr = buf, .len = 0 };
 		while (bufsiz && *buf != ':') {
+			name.len++;
 			buf++;
 			bufsiz--;
 		}
 		if (bufsiz == 0)
 			return false;
-		*buf = '\0';
+		// skip ':'
 		buf++;
 		bufsiz--;
-		makelower(name);
 
 		while (bufsiz && *buf == ' ') {
 			buf++;
 			bufsiz--;
 		}
 
-		char *value = buf;
+		str_t value = { .ptr = buf, .len = 0 };
 		while (bufsiz && *buf != '\r') {
+			value.len++;
 			buf++;
 			bufsiz--;
 		}
 		if (bufsiz < 2)
 			return false;
-		*buf = '\0';
+		// skip "\r\n"
 		buf += 2;
 		bufsiz -= 2;
 
-		if (strcasecmp(name, "cookie") == 0) {
+		if (str_caseqz(name, "cookie")) {
 			if (!parse_cookie(req, value))
 				return false;
-		} else {
-			struct kv *new = kvlist_extend(&req->headers);
-			new->name = name;
-			new->value = value;
 		}
+		struct kv *new = kvlist_extend(&req->headers);
+		new->name = name;
+		new->value = value;
 	}
 
 	return true;
@@ -343,8 +364,8 @@ static void handle(int fd, struct route *routes, size_t n_routes, sqlite3 *db) {
 	ssize_t nread = recv_until_rnrn(fd, buf, sizeof(buf));
 	if (nread == -1) {
 		cweb_set_status(&res, STATUS_BAD_REQUEST);
-		cweb_add_header(&res, "Content-Type", "text/plain");
-		cweb_append_lit(&res, "Request Too Large");
+		cweb_add_header(&res, STR("Content-Type"), STR("text/plain"));
+		cweb_append(&res, STR("Request Too Large"));
 
 		respond(fd, &res);
 		return;
@@ -414,23 +435,27 @@ static void parse_route_spec_path(const char *path, struct route *route) {
 		if (*path == '{') {
 			path++;
 			route->segments[route->n_segments - 1].is_glob = true;
-			const char *start = path;
-			while (*path && *path != '}')
+			str_t segname = { .ptr = path, .len = 0 };
+			while (*path && *path != '}') {
+				segname.len++;
 				path++;
-			if (*path == 0)
+			}
+			if (*path == '\0')
 				errx(1, "unclosed '{' in path '%s'", path);
-			if (path - start == 0)
+			if (segname.len == 0)
 				errx(1, "empty glob segment");
-			route->segments[route->n_segments - 1].str = strndup(start, path - start);
+			route->segments[route->n_segments - 1].str = segname;
 			path++;
 			if (*path == '/')
 				path++;
 		} else {
 			route->segments[route->n_segments - 1].is_glob = false;
-			const char *start = path;
-			while (*path && *path != '/')
+			str_t segname = { .ptr = path, .len = 0 };
+			while (*path && *path != '/') {
+				segname.len++;
 				path++;
-			route->segments[route->n_segments - 1].str = strndup(start, path - start);
+			}
+			route->segments[route->n_segments - 1].str = segname;
 			if (*path == '/')
 				path++;
 		}
@@ -483,103 +508,109 @@ void cweb_run(struct cweb_args *args) {
 	}
 }
 
-char *cweb_get_query(struct request *req, char *name) {
+const str_t *cweb_get_query(struct request *req, str_t name) {
 	return kvlist_get(&req->params, name);
 }
 
-char *cweb_get_segment(struct request *req, char *name) {
+const str_t *cweb_get_segment(struct request *req, str_t name) {
 	return kvlist_get(&req->named_segments, name);
 }
 
-void cweb_append(struct response *res, const char *stuff, size_t len) {
-	if (len == 0)
+void cweb_append(struct response *res, str_t stuff) {
+	if (stuff.len == 0)
 		return;
-	res->body = realloc(res->body, res->body_len + len);
-	memcpy(res->body + res->body_len, stuff, len);
-	res->body_len += len;
+	res->body = realloc(res->body, res->body_len + stuff.len);
+	memcpy(res->body + res->body_len, stuff.ptr, stuff.len);
+	res->body_len += stuff.len;
 }
 
-void cweb_append_html_escaped(struct response *res, const char *s) {
-	while (*s) {
-		const char *runstart = s;
-		while (*s && *s != '&' && *s != '<' && *s != '>' && *s != '"' && *s != '\'')
-			s++;
-		cweb_append(res, runstart, s - runstart);
-		if (*s == '\0')
+void cweb_append_html_escaped(struct response *res, str_t s) {
+	while (s.len) {
+		str_t run = { .ptr = s.ptr, .len = 0 };
+		char ch = *s.ptr;
+		while (s.len && ch != '&' && ch != '<' && ch != '>' && ch != '"' && ch != '\'') {
+			s.ptr++;
+			s.len--;
+			run.len++;
+		}
+		cweb_append(res, run);
+		if (s.len == 0)
 			break;
-		switch (*(s++)) {
+		switch (*(s.ptr++)) {
 		case '&':
-			cweb_append_lit(res, "&amp;");
+			cweb_append(res, STR("&amp;"));
 			break;
 		case '<':
-			cweb_append_lit(res, "&lt;");
+			cweb_append(res, STR("&lt;"));
 			break;
 		case '>':
-			cweb_append_lit(res, "&gt;");
+			cweb_append(res, STR("&gt;"));
 			break;
 		case '"':
-			cweb_append_lit(res, "&#034;");
+			cweb_append(res, STR("&#034;"));
 			break;
 		case '\'':
-			cweb_append_lit(res, "&#039;");
+			cweb_append(res, STR("&#039;"));
 			break;
 		}
 	}
 }
 
-void cweb_add_header(struct response *res, char *name, char *value) {
+void cweb_add_header(struct response *res, str_t name, str_t value) {
 	struct kv *new = kvlist_extend(&res->headers);
-	new->name = strdup(name);
-	new->value = strdup(value);
+	new->name = str_dup(name);
+	new->value = str_dup(value);
 }
 
 void cweb_set_status(struct response *res, enum status_code status) {
 	res->status = status;
 }
 
-void cweb_set_cookie(struct response *res, char *name, char *value) {
+void cweb_set_cookie(struct response *res, str_t name, str_t value) {
 	char val[4096];
-	int nwrite = snprintf(val, sizeof(val), "%s=%s; Max-Age=2592000; Path=/", name, value);
+	int nwrite = snprintf(val, sizeof(val), "%.*s=%.*s; Max-Age=2592000; Path=/", PRSTR(name), PRSTR(value));
 	if (nwrite == sizeof(val) - 1) {
-		fprintf(stderr, "Cookie \"%s=%s\" too big! Ignoring...\n", name, value);
+		fprintf(stderr, "Cookie \"%.*s=%.*s\" too big! Ignoring...\n", PRSTR(name), PRSTR(value));
 		return;
 	}
-	cweb_add_header(res, "Set-Cookie", val);
+	str_t valstr = { .ptr = val, .len = nwrite };
+	cweb_add_header(res, STR("Set-Cookie"), valstr);
 }
 
-void cweb_delete_cookie(struct response *res, char *name) {
+void cweb_delete_cookie(struct response *res, str_t name) {
 	char val[4096];
-	int nwrite = snprintf(val, sizeof(val), "%s=x; Max-Age=-1", name);
+	int nwrite = snprintf(val, sizeof(val), "%.*s=x; Max-Age=-1", PRSTR(name));
 	if (nwrite == sizeof(val) - 1) {
-		fprintf(stderr, "Header to delete cookie \"%s\" too big!", name);
+		fprintf(stderr, "Header to delete cookie \"%.*s\" too big!", PRSTR(name));
 		return;
 	}
-	cweb_add_header(res, "Set-Cookie", val);
+	str_t valstr = { .ptr = val, .len = nwrite };
+	cweb_add_header(res, STR("Set-Cookie"), valstr);
 }
 
-char *cweb_get_cookie(struct request *req, char *name) {
+const str_t *cweb_get_cookie(struct request *req, str_t name) {
 	return kvlist_get(&req->cookies, name);
 }
 
 void not_found(struct response *res) {
 	cweb_set_status(res, STATUS_NOT_FOUND);
-	cweb_add_header(res, "Content-Type", "text/plain");
-	cweb_append_lit(res, "Not Found");
+	cweb_add_header(res, STR("Content-Type"), STR("text/plain"));
+	cweb_append(res, STR("Not Found"));
 }
 
 void bad_request(struct response *res) {
 	cweb_set_status(res, STATUS_BAD_REQUEST);
-	cweb_add_header(res, "Content-Type", "text/plain");
-	cweb_append_lit(res, "Bad Request");
+	cweb_add_header(res, STR("Content-Type"), STR("text/plain"));
+	cweb_append(res, STR("Bad Request"));
 }
 
 void server_error(struct response *res) {
 	cweb_set_status(res, STATUS_SERVER_ERROR);
-	cweb_add_header(res, "Content-Type", "text/plain");
-	cweb_append_lit(res, "Internal Server Error");
+	cweb_add_header(res, STR("Content-Type"), STR("text/plain"));
+	cweb_append(res, STR("Internal Server Error"));
 }
 
-void redirect(struct response *res, char *to) {
+void redirect(struct response *res, str_t to) {
 	cweb_set_status(res, STATUS_FOUND);
-	cweb_add_header(res, "Location", to);
+	cweb_add_header(res, STR("Location"), to);
 }

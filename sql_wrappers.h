@@ -37,4 +37,15 @@ static inline void sql_bind_text(
 	}
 }
 
+static inline str_t sql_column_str(
+	sqlite3_stmt *s,
+	int iCol
+) {
+	str_t ret = {
+		.ptr = (char *)sqlite3_column_text(s, iCol),
+		.len = sqlite3_column_bytes(s, iCol),
+	};
+	return ret;
+}
+
 #endif

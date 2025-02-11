@@ -4,14 +4,13 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "sqlite3.h"
-
-#define cweb_append_lit(res, lit) cweb_append(res, ""lit"", sizeof(lit) - 1)
+#include "str.h"
 
 #define FILTERS(...) (filter_func_t[]){ __VA_ARGS__, NULL }
 
 #define render_html(res, basename, ...) \
 	do { \
-		cweb_add_header(res, "Content-Type", "text/html"); \
+		cweb_add_header(res, STR("Content-Type"), STR("text/html")); \
 		__tmplfunc_##basename(res, &(struct __tmplargs_##basename){__VA_ARGS__}); \
 	} while (0)
 
@@ -20,8 +19,8 @@ enum method {
 };
 
 struct kv {
-	char *name;
-	char *value;
+	str_t name;
+	str_t value;
 };
 
 struct kvlist {
@@ -31,9 +30,9 @@ struct kvlist {
 
 struct request {
 	enum method method;
-	char *uri;
+	str_t uri;
 	size_t n_segments;
-	char **segments;
+	str_t *segments;
 	struct kvlist named_segments;
 	struct kvlist params;
 	struct kvlist headers;
@@ -83,20 +82,20 @@ struct cweb_args {
 
 void cweb_run(struct cweb_args *args);
 
-char *cweb_get_query(struct request *req, char *name);
-char *cweb_get_segment(struct request *req, char *name);
-char *cweb_get_cookie(struct request *req, char *name);
+const str_t *cweb_get_query(struct request *req, str_t name);
+const str_t *cweb_get_segment(struct request *req, str_t name);
+const str_t *cweb_get_cookie(struct request *req, str_t name);
 
-void cweb_add_header(struct response *res, char *name, char *value);
+void cweb_add_header(struct response *res, str_t name, str_t value);
 void cweb_set_status(struct response *res, enum status_code status);
-void cweb_append(struct response *res, const char *stuff, size_t len);
-void cweb_append_html_escaped(struct response *res, const char *s);
-void cweb_set_cookie(struct response *res, char *name, char *value);
-void cweb_delete_cookie(struct response *res, char *name);
+void cweb_append(struct response *res, str_t stuff);
+void cweb_append_html_escaped(struct response *res, str_t s);
+void cweb_set_cookie(struct response *res, str_t name, str_t value);
+void cweb_delete_cookie(struct response *res, str_t name);
 
 void not_found(struct response *res);
 void bad_request(struct response *res);
 void server_error(struct response *res);
-void redirect(struct response *res, char *to);
+void redirect(struct response *res, str_t to);
 
 #endif
