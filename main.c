@@ -219,6 +219,11 @@ static void logout_handler(struct request *req, struct response *res, sqlite3 *d
 	render_html(res, logout, 0);
 }
 
+static void graph_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req; (void)db;
+	render_html(res, graph, 0);
+}
+
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
 	sqlite3_stmt *q = NULL;
@@ -417,9 +422,11 @@ int main(void) {
 		{ "/auth", auth_handler },
 		{ "/join/{refcode}", invite_handler },
 		{ "/static/style.css", cweb_static_handler },
+		{ "/static/vis.js", cweb_static_handler },
 
 		{ "/", index_handler, FILTERS(require_account) },
 		{ "/welcome", welcome_handler, FILTERS(require_account) },
+		{ "/graph", graph_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){

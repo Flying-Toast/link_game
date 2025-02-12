@@ -2,9 +2,13 @@
 	box-sizing: border-box;
 }
 
+html, body {
+	height: 100%;
+}
+
 body {
-	text-align: center;
-	margin: 8px;
+	padding: 8px;
+	margin: 0;
 	background-color: #BDBDBD;
 	font-family: monospace;
 }
@@ -32,10 +36,6 @@ hr {
 	border-top: 1px solid #7B7B7B;
 }
 
-.center {
-	text-align: center;
-}
-
 h1 {
 	color: white;
 	background: linear-gradient(to right, #000080, #1084D0);
@@ -45,11 +45,6 @@ h1 {
 	font-weight: normal;
 }
 
-.main-wrapper {
-	display: inline-block;
-	text-align: start;
-}
-
 ul {
 	list-style: square;
 	padding-left: 30px;
@@ -57,4 +52,16 @@ ul {
 
 p, ul {
 	margin-bottom: 0;
+}
+
+.main-wrapper {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-width: 800px;
+	margin: 0 auto;
+}
+
+.graph-wrapper {
+	max-width: none;
 }
