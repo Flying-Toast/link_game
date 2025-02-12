@@ -6,6 +6,7 @@ CREATE TABLE user (
 	join_time INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 	refcode TEXT NOT NULL,
 	inviter INTEGER NOT NULL,
+	ldap_title TEXT,
 	fullname TEXT,
 
 	FOREIGN KEY (inviter) REFERENCES user (rowid)

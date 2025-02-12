@@ -21,6 +21,7 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	LDAP *ldap = NULL;
 	LDAPMessage *resultchain = NULL;
 	struct berval **cn_values = NULL;
+	struct berval **title_values = NULL;
 	sqlite3_stmt *s = NULL;
 
 	e = ldap_initialize(&ldap, "ldaps://ldap.case.edu:636");
@@ -36,7 +37,7 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 
 	char filter[100];
 	snprintf(filter, sizeof(filter), "(uid=%.*s)", PRSTR(caseid));
-	char *attrs[] = {"cn", NULL};
+	char *attrs[] = {"cn", "title", NULL};
 	e = ldap_search_ext_s(
 		ldap,
 		"ou=People,o=cwru.edu,o=isp",
@@ -47,7 +48,7 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 		NULL,
 		NULL,
 		NULL,
-		1,
+		-1,
 		&resultchain
 	);
 	if (e) {
@@ -62,21 +63,23 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	}
 
 	cn_values = ldap_get_values_len(ldap, fent, "cn");
-	if (*cn_values == NULL) {
+	if (cn_values == NULL || cn_values[0] == NULL) {
 		fprintf(stderr, "no cn values for caseid %.*s\n", PRSTR(caseid));
 		goto out;
 	}
-	struct berval *fcn = *cn_values;
+	title_values = ldap_get_values_len(ldap, fent, "title");
 
 	sql_prepare_v2(
 		db,
-		"UPDATE user SET fullname = ? WHERE caseid = ?;",
+		"UPDATE user SET fullname = ?, ldap_title = ? WHERE caseid = ?;",
 		-1,
 		&s,
 		NULL
 	);
-	sql_bind_text(s, 1, fcn->bv_val, (int)fcn->bv_len);
-	sql_bind_text(s, 2, caseid.ptr, (int)caseid.len);
+	sql_bind_text(s, 1, cn_values[0]->bv_val, (int)cn_values[0]->bv_len);
+	if (title_values && title_values[0] != NULL)
+		sql_bind_text(s, 2, title_values[0]->bv_val, (int)title_values[0]->bv_len);
+	sql_bind_text(s, 3, caseid.ptr, (int)caseid.len);
 	if (sqlite3_step(s) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
@@ -84,6 +87,7 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 out:
 	sqlite3_finalize(s);
 	ldap_value_free_len(cn_values);
+	ldap_value_free_len(title_values);
 	ldap_msgfree(resultchain);
 	ldap_unbind_ext_s(ldap, NULL, NULL);
 	return ret;
