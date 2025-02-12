@@ -1,5 +1,8 @@
 <%include tmpl/head>
 
-you already joined dummy
+<h1>Already Joined!</h1>
+<hr>
+<p>You can only be invited once! You've already accepted someone's invite link.</p>
+<p><a href="/">home</a></p>
 
 <%include tmpl/foot>

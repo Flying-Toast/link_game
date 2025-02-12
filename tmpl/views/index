@@ -1,5 +1,6 @@
 <%include tmpl/head>
 
-<h1>Hello!</h1>
+<h1>LinkChain</h1>
+<hr></hr>
 
 <%include tmpl/foot>
