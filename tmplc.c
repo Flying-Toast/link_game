@@ -207,9 +207,11 @@ static void do_func(const char *basename, char *buf) {
 		const char *runstart = buf;
 		buf += next_placeholder(buf);
 
-		printf("\tcweb_append(res, STR(");
-		print_strlit(runstart, buf - runstart);
-		printf("));\n");
+		if (buf - runstart > 0) {
+			printf("\tcweb_append(res, STR(");
+			print_strlit(runstart, buf - runstart);
+			printf("));\n");
+		}
 
 		if (*buf == 0)
 			break;
