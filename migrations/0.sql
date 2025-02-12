@@ -7,11 +7,11 @@ CREATE TABLE user (
 	refcode TEXT NOT NULL,
 	inviter INTEGER NOT NULL,
 	ldap_title TEXT,
-	fullname TEXT,
+	displayname TEXT,
 
 	FOREIGN KEY (inviter) REFERENCES user (rowid)
 ) STRICT;
-INSERT INTO user (caseid, refcode, inviter, fullname) VALUES ('srs266', '8f7bc7014d00c0d0', 1, 'Simon Schwartz');
+INSERT INTO user (caseid, refcode, inviter, displayname) VALUES ('srs266', '8f7bc7014d00c0d0', 1, 'Simon Schwartz');
 
 CREATE TABLE session (
 	secret INTEGER NOT NULL UNIQUE,

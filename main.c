@@ -23,6 +23,7 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	struct berval **cn_values = NULL;
 	struct berval **title_values = NULL;
 	sqlite3_stmt *s = NULL;
+	str_t displayname = caseid;
 
 	e = ldap_initialize(&ldap, "ldaps://ldap.case.edu:636");
 	if (e) {
@@ -57,26 +58,24 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	}
 
 	LDAPMessage *fent = ldap_first_entry(ldap, resultchain);
-	if (fent == NULL) {
-		fprintf(stderr, "ldap search for caseid %.*s returned no entries\n", PRSTR(caseid));
-		goto out;
+	if (fent != NULL) {
+		// displayname is LDAP cn, fallback to caseid
+		cn_values = ldap_get_values_len(ldap, fent, "cn");
+		if (cn_values != NULL && cn_values[0] != NULL) {
+			displayname.ptr = cn_values[0]->bv_val;
+			displayname.len = cn_values[0]->bv_len;
+		}
+		title_values = ldap_get_values_len(ldap, fent, "title");
 	}
-
-	cn_values = ldap_get_values_len(ldap, fent, "cn");
-	if (cn_values == NULL || cn_values[0] == NULL) {
-		fprintf(stderr, "no cn values for caseid %.*s\n", PRSTR(caseid));
-		goto out;
-	}
-	title_values = ldap_get_values_len(ldap, fent, "title");
 
 	sql_prepare_v2(
 		db,
-		"UPDATE user SET fullname = ?, ldap_title = ? WHERE caseid = ?;",
+		"UPDATE user SET displayname = ?, ldap_title = ? WHERE caseid = ?;",
 		-1,
 		&s,
 		NULL
 	);
-	sql_bind_text(s, 1, cn_values[0]->bv_val, (int)cn_values[0]->bv_len);
+	sql_bind_text(s, 1, displayname.ptr, displayname.len);
 	if (title_values && title_values[0] != NULL)
 		sql_bind_text(s, 2, title_values[0]->bv_val, (int)title_values[0]->bv_len);
 	sql_bind_text(s, 3, caseid.ptr, (int)caseid.len);
@@ -213,7 +212,7 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 
 	sql_prepare_v2(
 		db,
-		"SELECT refcode, fullname FROM user WHERE rowid = ?;",
+		"SELECT refcode, displayname FROM user WHERE rowid = ?;",
 		-1,
 		&q,
 		NULL
@@ -222,9 +221,9 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	if (sqlite3_step(q) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t refcode = sql_column_str(q, 0);
-	str_t fullname = sql_column_str(q, 1);
+	str_t displayname = sql_column_str(q, 1);
 
-	render_html(res, index, .refcode = refcode, .myname = fullname);
+	render_html(res, index, .refcode = refcode, .myname = displayname);
 	sqlite3_finalize(q);
 }
 
@@ -348,7 +347,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	str_t refcode = *cweb_get_segment(req, STR("refcode"));
 	sql_prepare_v2(
 		db,
-		"SELECT caseid, rowid, fullname FROM user WHERE refcode = ?;",
+		"SELECT caseid, rowid, displayname FROM user WHERE refcode = ?;",
 		-1,
 		&invq,
 		NULL
