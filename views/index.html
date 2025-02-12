@@ -3,10 +3,13 @@
 <div class="outset">
 	<h1>ChainLink</h1>
 	<hr>
-	<h2>Hello <%s myname>!</h2>
-	<p>Your invite link is: <a href="http://localhost:8080/join/<%s refcode>">chainlink.case.edu/join/<%s refcode></a>.</p>
-	<p>Spread your link to as many people as possible.</p>
-	<p>CWRU students worth 1 point. CWRU faculty members are 5 points. Eric Kaler is worth 100 points.</p>
+	<p>Hi <%s myname>! Your invite link is <a href="http://chainlink.case.edu/join/<%s refcode>">chainlink.case.edu/join/<%s refcode></a>.</p>
+	<p>Spread your link to get points:</p>
+	<ul>
+		<li>CWRU students who join using your link give you 1 point.</li>
+		<li>Faculty members give you 5 points.</li>
+		<li>Eric Kaler is worth 100 points.</li>
+	</ul>
 </div>
 
 <%include views/foot>

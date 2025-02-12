@@ -208,7 +208,7 @@ out:
 static void logout_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
 	cweb_delete_cookie(res, STR("s"));
-	redirect(res, STR("/"));
+	render_html(res, logout, 0);
 }
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {

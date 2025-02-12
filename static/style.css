@@ -5,7 +5,6 @@
 body {
 	text-align: center;
 	margin: 8px;
-	font-size: 16px;
 	background-color: #BDBDBD;
 	font-family: monospace;
 }
@@ -40,15 +39,10 @@ hr {
 h1 {
 	color: white;
 	background: linear-gradient(to right, #000080, #1084D0);
-	font-size: 20px;
+	font-size: 150%;
 	margin-top: 0;
 	padding: 4px 8px;
 	font-weight: normal;
-}
-
-h2 {
-	font-size: 18px;
-	margin-top: 0;
 }
 
 .main-wrapper {
@@ -56,6 +50,11 @@ h2 {
 	text-align: start;
 }
 
-p {
-	margin: 18px 0;
+ul {
+	list-style: square;
+	padding-left: 30px;
+}
+
+p, ul {
+	margin-bottom: 0;
 }
