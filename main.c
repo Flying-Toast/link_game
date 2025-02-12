@@ -366,9 +366,10 @@ int main(void) {
 		{ "/logout", logout_handler },
 		{ "/auth", auth_handler },
 		{ "/join/{refcode}", invite_handler },
+		{ "/static/style.css", cweb_static_handler },
 
 		{ "/", index_handler, FILTERS(require_account) },
-		{ "/welcome", welcome_handler, FILTERS(require_account) }
+		{ "/welcome", welcome_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){

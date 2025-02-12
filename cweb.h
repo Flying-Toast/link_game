@@ -93,6 +93,7 @@ void cweb_append_html_escaped(struct response *res, str_t s);
 void cweb_set_cookie(struct response *res, str_t name, str_t value);
 void cweb_delete_cookie(struct response *res, str_t name);
 
+void cweb_static_handler(struct request *req, struct response *res, sqlite3 *db);
 void not_found(struct response *res);
 void bad_request(struct response *res);
 void server_error(struct response *res);

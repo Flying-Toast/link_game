@@ -37,6 +37,13 @@ str_t str_dup(str_t s) {
 	return ret;
 }
 
+char *str_dupz(str_t s) {
+	char *ret = malloc(s.len + 1);
+	memcpy(ret, s.ptr, s.len);
+	ret[s.len] = '\0';
+	return ret;
+}
+
 int64_t str_toi64(str_t s, bool *ok_out, unsigned base) {
 	if (base != 10 && base != 16)
 		errx(1, "%s: unsupported base %u", __func__, base);

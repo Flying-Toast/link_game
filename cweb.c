@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
 #include <err.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +23,19 @@ struct route {
 		str_t str;
 	} *segments;
 };
+
+static ssize_t readall(int fd, char *buf, size_t count) {
+	ssize_t nread = 0;
+	while (count) {
+		ssize_t n = read(fd, buf, count);
+		if (n == -1)
+			return -1;
+		nread += n;
+		buf += n;
+		count -= n;
+	}
+	return nread;
+}
 
 static str_t *kvlist_get(struct kvlist *kvs, str_t name) {
 	for (size_t i = 0; i < kvs->n; i++) {
@@ -613,4 +628,28 @@ void server_error(struct response *res) {
 void redirect(struct response *res, str_t to) {
 	cweb_set_status(res, STATUS_FOUND);
 	cweb_add_header(res, STR("Location"), to);
+}
+
+void cweb_static_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)db;
+	str_t fname = req->uri;
+	// skip '/'
+	fname.len--;
+	fname.ptr++;
+
+	char *fnamez = str_dupz(fname);
+	struct stat sb;
+	if (stat(fnamez, &sb) == -1)
+		err(1, "stat");
+	int fd = open(fnamez, O_RDONLY);
+	if (fd == -1)
+		err(1, "open");
+	assert(res->body_len == 0);
+	res->body_len = sb.st_size;
+	res->body = malloc(sb.st_size);
+	if (readall(fd, res->body, sb.st_size) == -1)
+		err(1, "readall");
+
+	close(fd);
+	free(fnamez);
 }
