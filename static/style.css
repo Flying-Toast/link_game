@@ -38,9 +38,12 @@ hr {
 }
 
 h1 {
+	color: white;
+	background: linear-gradient(to right, #000080, #1084D0);
 	font-size: 20px;
 	margin-top: 0;
-	text-align: center;
+	padding: 4px 8px;
+	font-weight: normal;
 }
 
 h2 {
