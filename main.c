@@ -242,7 +242,22 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 
 static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
-	render_html(res, welcome, 0);
+	sqlite3_stmt *q = NULL;
+
+	sql_prepare_v2(
+		db,
+		"SELECT firstname FROM user WHERE rowid = ?;",
+		-1,
+		&q,
+		NULL
+	);
+	sql_bind_int64(q, 1, req->uid);
+	if (sqlite3_step(q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t firstname = sql_column_str(q, 0);
+
+	render_html(res, welcome, .myname = firstname);
+	sqlite3_finalize(q);
 }
 
 static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
