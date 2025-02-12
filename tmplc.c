@@ -40,6 +40,21 @@ static ssize_t readall(int fd, char *buf, size_t count) {
 	return nread;
 }
 
+char *read_file(const char *fname) {
+	struct stat sb;
+	if (stat(fname, &sb) == -1)
+		err(1, "stat");
+	int fd = open(fname, O_RDONLY);
+	if (fd == -1)
+		err(1, "open");
+	char *buf = malloc(sb.st_size + 1);
+	if (readall(fd, buf, sb.st_size) == -1)
+		err(1, "readall");
+	buf[sb.st_size] = '\0';
+	close(fd);
+	return buf;
+}
+
 static size_t next_placeholder(const char *ptr) {
 	ssize_t dist = 0;
 	while (ptr[dist] && strncmp(ptr + dist, "<%", 2) != 0)
@@ -133,6 +148,20 @@ static bool strvec_contains(const str_t *haystack, size_t n, str_t needle) {
 	return false;
 }
 
+static void include(str_t fname) {
+	char *fname_cstr = malloc(fname.len + 1);
+	fname_cstr[fname.len] = '\0';
+	memcpy(fname_cstr, fname.ptr, fname.len);
+	char *buf = read_file(fname_cstr);
+
+	printf("\tcweb_append(res, STR(");
+	print_strlit(buf, strlen(buf));
+	printf("));\n");
+
+	free(buf);
+	free(fname_cstr);
+}
+
 static void do_args(const char *basename, char *buf) {
 	size_t nargs = 0;
 	str_t *seen_args = NULL;
@@ -144,6 +173,9 @@ static void do_args(const char *basename, char *buf) {
 			break;
 		str_t spec, name;
 		buf += parse_placeholder(buf, &spec, &name);
+
+		if (str_eq(spec, STR("include")))
+			continue;
 
 		if (strvec_contains(seen_args, nargs, name))
 			continue;
@@ -184,38 +216,20 @@ static void do_func(const char *basename, char *buf) {
 
 		str_t spec, name;
 		buf += parse_placeholder(buf, &spec, &name);
-		append_arg(spec, name);
+
+		if (str_eq(spec, STR("include")))
+			include(name);
+		else
+			append_arg(spec, name);
 	}
 	printf("}\n");
 }
 
 int main(int argc, char **argv) {
-	char *buf = NULL;
-	off_t cap = 0;
-
 	for (int i = 1; i < argc; i++) {
-		struct stat statbuf;
 		char *fname = argv[i];
-		if (stat(fname, &statbuf) == -1)
-			err(1, "stat");
-
-		off_t needcap = statbuf.st_size + 1;
-		if (needcap > cap) {
-			free(buf);
-			buf = malloc(needcap);
-			cap = needcap;
-		}
-
-		int fd = open(fname, O_RDONLY);
-		if (fd == -1)
-			err(1, "open");
-		readall(fd, buf, statbuf.st_size);
-		buf[statbuf.st_size] = '\0';
-		if (statbuf.st_size > 1 && buf[statbuf.st_size - 1] == '\n')
-			buf[statbuf.st_size - 1] = '\0';
-		close(fd);
-
-		const char *basename = fname + strlen(fname);
+		char *buf = read_file(fname);
+		char *basename = fname + strlen(fname);
 		while (basename > fname && basename[-1] != '/')
 			basename--;
 
@@ -224,5 +238,6 @@ int main(int argc, char **argv) {
 
 		if (i != argc - 1)
 			puts("");
+		free(buf);
 	}
 }

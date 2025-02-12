@@ -1,0 +1,5 @@
+<%include tmpl/head>
+
+<h1>THIS IS THE WELCOME PAGE TODO TODO!</h1>
+
+<%include tmpl/foot>

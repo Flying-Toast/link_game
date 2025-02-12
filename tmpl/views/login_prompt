@@ -1,0 +1,6 @@
+<%include tmpl/head>
+
+<p>You must be logged in to view this page.</p>
+<p>Please <a href="/login">Log in</a>.</p>
+
+<%include tmpl/foot>
