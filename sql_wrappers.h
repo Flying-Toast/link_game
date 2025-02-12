@@ -3,6 +3,7 @@
 
 #include <err.h>
 #include <inttypes.h>
+#include "str.h"
 
 static inline void sql_prepare_v2(
 	sqlite3 *db,
@@ -25,16 +26,11 @@ static inline void sql_bind_int64(sqlite3_stmt *s, int idx, sqlite3_int64 x) {
 static inline void sql_bind_text(
 	sqlite3_stmt *s,
 	int idx,
-	const char *text,
-	int len
+	str_t text
 ) {
-	int err = sqlite3_bind_text(s, idx, text, len, SQLITE_TRANSIENT);
-	if (err != SQLITE_OK) {
-		if (len < 0)
-			errx(1, "sql_bind_text(idx = %d, text = %s): %s", idx, text, sqlite3_errstr(err));
-		else
-			errx(1, "sql_bind_text(idx = %d, text = %.*s): %s", idx, (int)len, text, sqlite3_errstr(err));
-	}
+	int err = sqlite3_bind_text(s, idx, text.ptr, text.len, SQLITE_STATIC);
+	if (err != SQLITE_OK)
+		errx(1, "sql_bind_text(idx = %d, text = %.*s): %s", idx, PRSTR(text), sqlite3_errstr(err));
 }
 
 static inline str_t sql_column_str(

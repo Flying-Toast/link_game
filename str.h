@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define PRSTR(s) (int)(s).len, (s).ptr
 #define STR(lit) (str_t){ .ptr = ""lit"", .len = sizeof(lit) - 1 }
@@ -22,6 +23,14 @@ static inline str_t string2str(string_t s) {
 	str_t ret = {
 		.ptr = s.ptr,
 		.len = s.len,
+	};
+	return ret;
+}
+
+static inline str_t ztostr(const char *cstring) {
+	str_t ret = {
+		.ptr = cstring,
+		.len = strlen(cstring),
 	};
 	return ret;
 }

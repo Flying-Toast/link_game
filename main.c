@@ -75,10 +75,15 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 		&s,
 		NULL
 	);
-	sql_bind_text(s, 1, displayname.ptr, displayname.len);
-	if (title_values && title_values[0] != NULL)
-		sql_bind_text(s, 2, title_values[0]->bv_val, (int)title_values[0]->bv_len);
-	sql_bind_text(s, 3, caseid.ptr, (int)caseid.len);
+	sql_bind_text(s, 1, displayname);
+	if (title_values && title_values[0] != NULL) {
+		str_t tv = {
+			.ptr = title_values[0]->bv_val,
+			.len = title_values[0]->bv_len,
+		};
+		sql_bind_text(s, 2, tv);
+	}
+	sql_bind_text(s, 3, caseid);
 	if (sqlite3_step(s) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
@@ -125,13 +130,13 @@ static int64_t gen_session(sqlite3 *db, char *caseid) {
 	sqlite3_stmt *ins = NULL;
 
 	sql_prepare_v2(db, "DELETE FROM session WHERE caseid = ?;", -1, &del, NULL);
-	sql_bind_text(del, 1, caseid, -1);
+	sql_bind_text(del, 1, ztostr(caseid));
 	if (sqlite3_step(del) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
 	sql_prepare_v2(db, "INSERT INTO session (secret, caseid) VALUES (?, ?);", -1, &ins, NULL);
 	sql_bind_int64(ins, 1, sid);
-	sql_bind_text(ins, 2, caseid, -1);
+	sql_bind_text(ins, 2, ztostr(caseid));
 	if (sqlite3_step(ins) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
@@ -293,7 +298,10 @@ static void create_user(
 	int64_t current_sid
 ) {
 	char refcodebuf[100];
-	int refcodelen = snprintf(refcodebuf, sizeof(refcodebuf), "%"PRIx64, random_positive_int64());
+	str_t refcodestr = {
+		.len = snprintf(refcodebuf, sizeof(refcodebuf), "%"PRIx64, random_positive_int64()),
+		.ptr = refcodebuf
+	};
 
 	sqlite3_stmt *ins = NULL;
 	sql_prepare_v2(
@@ -305,7 +313,7 @@ static void create_user(
 		NULL
 	);
 	sql_bind_int64(ins, 1, inviter_uid);
-	sql_bind_text(ins, 2, refcodebuf, refcodelen);
+	sql_bind_text(ins, 2, refcodestr);
 	sql_bind_int64(ins, 3, current_sid);
 	if (sqlite3_step(ins) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -352,7 +360,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		&invq,
 		NULL
 	);
-	sql_bind_text(invq, 1, refcode.ptr, refcode.len);
+	sql_bind_text(invq, 1, refcode);
 	e = sqlite3_step(invq);
 	if (e == SQLITE_ROW) {
 		inviter_caseid = sql_column_str(invq, 0);

@@ -1,7 +1,6 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <err.h>
-#include <string.h>
 #include <stdint.h>
 #include "str.h"
 
