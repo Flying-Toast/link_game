@@ -209,7 +209,7 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 
 	sql_prepare_v2(
 		db,
-		"SELECT refcode FROM user WHERE rowid = ?;",
+		"SELECT refcode, fullname FROM user WHERE rowid = ?;",
 		-1,
 		&q,
 		NULL
@@ -218,8 +218,9 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	if (sqlite3_step(q) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t refcode = sql_column_str(q, 0);
+	str_t fullname = sql_column_str(q, 1);
 
-	render_html(res, index, .refcode = refcode);
+	render_html(res, index, .refcode = refcode, .myname = fullname);
 	sqlite3_finalize(q);
 }
 
