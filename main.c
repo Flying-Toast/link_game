@@ -364,7 +364,6 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	(void)req; (void)db;
 	int e;
 	sqlite3_stmt *invq = NULL;
-	str_t inviter_caseid = {0};
 	str_t inviter_name = {0};
 	int64_t inviter_uid;
 
@@ -378,7 +377,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	str_t refcode = *cweb_get_segment(req, STR("refcode"));
 	sql_prepare_v2(
 		db,
-		"SELECT caseid, rowid, fullname FROM user WHERE refcode = ?;",
+		"SELECT rowid, fullname FROM user WHERE refcode = ?;",
 		-1,
 		&invq,
 		NULL
@@ -386,9 +385,8 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	sql_bind_text(invq, 1, refcode);
 	e = sqlite3_step(invq);
 	if (e == SQLITE_ROW) {
-		inviter_caseid = sql_column_str(invq, 0);
-		inviter_uid = sqlite3_column_int64(invq, 1);
-		inviter_name = sql_column_str(invq, 2);
+		inviter_uid = sqlite3_column_int64(invq, 0);
+		inviter_name = sql_column_str(invq, 1);
 	} else {
 		if (e != SQLITE_DONE)
 			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -401,7 +399,6 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		render_html(
 			res,
 			invite_login_prompt,
-			.inviter_caseid = inviter_caseid,
 			.inviter_name = inviter_name,
 		);
 	} else {
