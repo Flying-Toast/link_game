@@ -1,7 +1,6 @@
 #include <curl/curl.h>
 #include <assert.h>
 #include <err.h>
-#include <time.h>
 #include <ldap.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -16,12 +15,13 @@
 
 #define SSO_SERVICE "https://fascinating-mochi-9ef846.netlify.app/"
 
-static bool store_user_ldap_info(char *caseid, sqlite3 *db) {
+static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	int e;
 	bool ret = false;
 	LDAP *ldap = NULL;
 	LDAPMessage *resultchain = NULL;
 	struct berval **cn_values = NULL;
+	sqlite3_stmt *s = NULL;
 
 	e = ldap_initialize(&ldap, "ldaps://ldap.case.edu:636");
 	if (e) {
@@ -35,7 +35,7 @@ static bool store_user_ldap_info(char *caseid, sqlite3 *db) {
 	}
 
 	char filter[100];
-	snprintf(filter, sizeof(filter), "(uid=%s)", caseid);
+	snprintf(filter, sizeof(filter), "(uid=%.*s)", PRSTR(caseid));
 	char *attrs[] = {"cn", NULL};
 	e = ldap_search_ext_s(
 		ldap,
@@ -57,21 +57,32 @@ static bool store_user_ldap_info(char *caseid, sqlite3 *db) {
 
 	LDAPMessage *fent = ldap_first_entry(ldap, resultchain);
 	if (fent == NULL) {
-		fprintf(stderr, "ldap search for caseid %s returned no entries\n", caseid);
+		fprintf(stderr, "ldap search for caseid %.*s returned no entries\n", PRSTR(caseid));
 		goto out;
 	}
 
 	cn_values = ldap_get_values_len(ldap, fent, "cn");
 	if (*cn_values == NULL) {
-		fprintf(stderr, "no cn values for caseid %s\n", caseid);
+		fprintf(stderr, "no cn values for caseid %.*s\n", PRSTR(caseid));
 		goto out;
 	}
 	struct berval *fcn = *cn_values;
 
-	fprintf(stderr, "TODO: %.*s\n", (int)fcn->bv_len, fcn->bv_val);
+	sql_prepare_v2(
+		db,
+		"UPDATE user SET fullname = ? WHERE caseid = ?;",
+		-1,
+		&s,
+		NULL
+	);
+	sql_bind_text(s, 1, fcn->bv_val, (int)fcn->bv_len);
+	sql_bind_text(s, 2, caseid.ptr, (int)caseid.len);
+	if (sqlite3_step(s) != SQLITE_DONE)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
 	ret = true;
 out:
+	sqlite3_finalize(s);
 	ldap_value_free_len(cn_values);
 	ldap_msgfree(resultchain);
 	ldap_unbind_ext_s(ldap, NULL, NULL);
@@ -257,27 +268,41 @@ static void create_user(
 	int64_t inviter_uid,
 	int64_t current_sid
 ) {
-	int64_t join_time = time(NULL);
 	char refcodebuf[100];
 	int refcodelen = snprintf(refcodebuf, sizeof(refcodebuf), "%"PRIx64, random_positive_int64());
 
-	sqlite3_stmt *s;
+	sqlite3_stmt *ins = NULL;
 	sql_prepare_v2(
 		db,
-		"INSERT INTO user (inviter, refcode, join_time, caseid)\n"
-		"VALUES (?,?,?, (SELECT caseid FROM session WHERE secret = ?));",
+		"INSERT INTO user (inviter, refcode, caseid)\n"
+		"VALUES (?, ?, (SELECT caseid FROM session WHERE secret = ?));",
 		-1,
-		&s,
+		&ins,
 		NULL
 	);
-	sql_bind_int64(s, 1, inviter_uid);
-	sql_bind_text(s, 2, refcodebuf, refcodelen);
-	sql_bind_int64(s, 3, join_time);
-	sql_bind_int64(s, 4, current_sid);
-	if (sqlite3_step(s) != SQLITE_DONE)
+	sql_bind_int64(ins, 1, inviter_uid);
+	sql_bind_text(ins, 2, refcodebuf, refcodelen);
+	sql_bind_int64(ins, 3, current_sid);
+	if (sqlite3_step(ins) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
-	sqlite3_finalize(s);
+	sqlite3_stmt *caseid_q = NULL;
+	sql_prepare_v2(
+		db,
+		"SELECT caseid FROM session WHERE secret = ?;",
+		-1,
+		&caseid_q,
+		NULL
+	);
+	sql_bind_int64(caseid_q, 1, current_sid);
+	if (sqlite3_step(caseid_q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t caseid = sql_column_str(caseid_q, 0);
+
+	store_user_ldap_info(caseid, db);
+
+	sqlite3_finalize(ins);
+	sqlite3_finalize(caseid_q);
 }
 
 static void invite_handler(struct request *req, struct response *res, sqlite3 *db) {
