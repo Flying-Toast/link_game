@@ -22,8 +22,10 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	LDAPMessage *resultchain = NULL;
 	struct berval **cn_values = NULL;
 	struct berval **title_values = NULL;
+	struct berval **gname_values = NULL;
 	sqlite3_stmt *s = NULL;
-	str_t displayname = caseid;
+	str_t fullname = caseid;
+	str_t firstname = caseid;
 
 	e = ldap_initialize(&ldap, "ldaps://ldap.case.edu:636");
 	if (e) {
@@ -38,7 +40,7 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 
 	char filter[100];
 	snprintf(filter, sizeof(filter), "(uid=%.*s)", PRSTR(caseid));
-	char *attrs[] = {"cn", "title", NULL};
+	char *attrs[] = {"cn", "title", "givenName", NULL};
 	e = ldap_search_ext_s(
 		ldap,
 		"ou=People,o=cwru.edu,o=isp",
@@ -59,23 +61,27 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 
 	LDAPMessage *fent = ldap_first_entry(ldap, resultchain);
 	if (fent != NULL) {
-		// displayname is LDAP cn, fallback to caseid
 		cn_values = ldap_get_values_len(ldap, fent, "cn");
 		if (cn_values != NULL && cn_values[0] != NULL) {
-			displayname.ptr = cn_values[0]->bv_val;
-			displayname.len = cn_values[0]->bv_len;
+			fullname.ptr = cn_values[0]->bv_val;
+			fullname.len = cn_values[0]->bv_len;
+		}
+		gname_values = ldap_get_values_len(ldap, fent, "givenName");
+		if (gname_values != NULL && gname_values[0] != NULL) {
+			firstname.ptr = gname_values[0]->bv_val;
+			firstname.len = gname_values[0]->bv_len;
 		}
 		title_values = ldap_get_values_len(ldap, fent, "title");
 	}
 
 	sql_prepare_v2(
 		db,
-		"UPDATE user SET displayname = ?, ldap_title = ? WHERE caseid = ?;",
+		"UPDATE user SET fullname = ?, ldap_title = ?, firstname = ? WHERE caseid = ?;",
 		-1,
 		&s,
 		NULL
 	);
-	sql_bind_text(s, 1, displayname);
+	sql_bind_text(s, 1, fullname);
 	if (title_values && title_values[0] != NULL) {
 		str_t tv = {
 			.ptr = title_values[0]->bv_val,
@@ -83,7 +89,8 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 		};
 		sql_bind_text(s, 2, tv);
 	}
-	sql_bind_text(s, 3, caseid);
+	sql_bind_text(s, 3, firstname);
+	sql_bind_text(s, 4, caseid);
 	if (sqlite3_step(s) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
@@ -92,6 +99,7 @@ out:
 	sqlite3_finalize(s);
 	ldap_value_free_len(cn_values);
 	ldap_value_free_len(title_values);
+	ldap_value_free_len(gname_values);
 	ldap_msgfree(resultchain);
 	ldap_unbind_ext_s(ldap, NULL, NULL);
 	return ret;
@@ -217,7 +225,7 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 
 	sql_prepare_v2(
 		db,
-		"SELECT refcode, displayname FROM user WHERE rowid = ?;",
+		"SELECT refcode, firstname FROM user WHERE rowid = ?;",
 		-1,
 		&q,
 		NULL
@@ -226,9 +234,9 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	if (sqlite3_step(q) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t refcode = sql_column_str(q, 0);
-	str_t displayname = sql_column_str(q, 1);
+	str_t firstname = sql_column_str(q, 1);
 
-	render_html(res, index, .refcode = refcode, .myname = displayname);
+	render_html(res, index, .refcode = refcode, .myname = firstname);
 	sqlite3_finalize(q);
 }
 
@@ -355,7 +363,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	str_t refcode = *cweb_get_segment(req, STR("refcode"));
 	sql_prepare_v2(
 		db,
-		"SELECT caseid, rowid, displayname FROM user WHERE refcode = ?;",
+		"SELECT caseid, rowid, fullname FROM user WHERE refcode = ?;",
 		-1,
 		&invq,
 		NULL
