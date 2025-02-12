@@ -51,8 +51,7 @@ enum status_code {
 struct response {
 	enum status_code status;
 	struct kvlist headers;
-	size_t body_len;
-	char *body;
+	string_t body;
 };
 
 enum filter_flow {

@@ -98,14 +98,14 @@ static void respond(int fd, struct response *res) {
 		}
 	}
 	// Content-Length, end headers
-	if (dprintf(fd, "Content-Length: %zu\r\n\r\n", res->body_len) < 0) {
+	if (dprintf(fd, "Content-Length: %zu\r\n\r\n", res->body.len) < 0) {
 		perror("dprintf");
 		return;
 	}
 
 	// body
-	if (res->body_len)
-		write(fd, res->body, res->body_len);
+	if (res->body.len)
+		write(fd, res->body.ptr, res->body.len);
 }
 
 static bool route_matches(struct route *r, struct request *req) {
@@ -532,11 +532,7 @@ const str_t *cweb_get_segment(struct request *req, str_t name) {
 }
 
 void cweb_append(struct response *res, str_t stuff) {
-	if (stuff.len == 0)
-		return;
-	res->body = realloc(res->body, res->body_len + stuff.len);
-	memcpy(res->body + res->body_len, stuff.ptr, stuff.len);
-	res->body_len += stuff.len;
+	string_append(&res->body, stuff);
 }
 
 void cweb_append_html_escaped(struct response *res, str_t s) {
@@ -644,11 +640,11 @@ void cweb_static_handler(struct request *req, struct response *res, sqlite3 *db)
 	int fd = open(fnamez, O_RDONLY);
 	if (fd == -1)
 		err(1, "open");
-	assert(res->body_len == 0);
-	res->body_len = sb.st_size;
-	res->body = malloc(sb.st_size);
-	if (readall(fd, res->body, sb.st_size) == -1)
+	assert(res->body.len == 0);
+	string_grow(&res->body, sb.st_size);
+	if (readall(fd, res->body.ptr, sb.st_size) == -1)
 		err(1, "readall");
+	res->body.len = sb.st_size;
 
 	close(fd);
 	free(fnamez);

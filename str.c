@@ -86,3 +86,19 @@ int64_t str_toi64(str_t s, bool *ok_out, unsigned base) {
 out:
 	return ret;
 }
+
+void string_grow(string_t *s, size_t newcap) {
+	if (newcap <= s->cap)
+		return;
+	s->cap = newcap;
+	s->ptr = realloc(s->ptr, newcap);
+}
+
+void string_append(string_t *s, str_t stuff) {
+	size_t newcap = s->cap == 0 ? stuff.len : s->cap;
+	while (newcap < s->len + stuff.len)
+		newcap *= 2;
+	string_grow(s, newcap);
+	memcpy(s->ptr + s->len, stuff.ptr, stuff.len);
+	s->len += stuff.len;
+}
