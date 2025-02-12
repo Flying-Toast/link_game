@@ -208,6 +208,11 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	render_html(res, index, 0);
 }
 
+static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req; (void)db;
+	render_html(res, welcome, 0);
+}
+
 static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
 	sqlite3_stmt *q = NULL;
 	int64_t uid;
@@ -357,11 +362,13 @@ out:
 
 int main(void) {
 	struct route_spec routes[] = {
-		{ "/", index_handler, FILTERS(require_account) },
 		{ "/login", login_handler },
 		{ "/logout", logout_handler },
 		{ "/auth", auth_handler },
 		{ "/join/{refcode}", invite_handler },
+
+		{ "/", index_handler, FILTERS(require_account) },
+		{ "/welcome", welcome_handler, FILTERS(require_account) }
 	};
 
 	cweb_run(&(struct cweb_args){
