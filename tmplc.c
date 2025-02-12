@@ -43,7 +43,7 @@ static ssize_t readall(int fd, char *buf, size_t count) {
 char *read_file(const char *fname) {
 	struct stat sb;
 	if (stat(fname, &sb) == -1)
-		err(1, "stat");
+		err(1, "stat(%s)", fname);
 	int fd = open(fname, O_RDONLY);
 	if (fd == -1)
 		err(1, "open");
@@ -232,8 +232,11 @@ int main(int argc, char **argv) {
 		char *fname = argv[i];
 		char *buf = read_file(fname);
 		char *basename = fname + strlen(fname);
-		while (basename > fname && basename[-1] != '/')
+		while (basename > fname && basename[-1] != '/') {
+			if (*basename == '.')
+				*basename = '\0';
 			basename--;
+		}
 
 		do_args(basename, buf);
 		do_func(basename, buf);

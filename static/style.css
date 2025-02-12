@@ -10,7 +10,7 @@ body {
 	font-family: monospace;
 }
 
-.outset {
+.inset {
 	padding: 10px;
 	border-left: 4px solid #7b7b7b;
 	border-top: 4px solid #7b7b7b;
@@ -18,7 +18,7 @@ body {
 	border-bottom: 4px solid white;
 }
 
-.inset {
+.outset {
 	padding: 10px;
 	border-left: 4px solid white;
 	border-top: 4px solid white;
@@ -46,4 +46,8 @@ h1 {
 .main-wrapper {
 	display: inline-block;
 	text-align: start;
+}
+
+p {
+	margin: 18px 0;
 }

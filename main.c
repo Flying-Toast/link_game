@@ -205,7 +205,22 @@ static void logout_handler(struct request *req, struct response *res, sqlite3 *d
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
-	render_html(res, index, 0);
+	sqlite3_stmt *q = NULL;
+
+	sql_prepare_v2(
+		db,
+		"SELECT refcode FROM user WHERE rowid = ?;",
+		-1,
+		&q,
+		NULL
+	);
+	sql_bind_int64(q, 1, req->uid);
+	if (sqlite3_step(q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t refcode = sql_column_str(q, 0);
+
+	render_html(res, index, .refcode = refcode);
+	sqlite3_finalize(q);
 }
 
 static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -315,6 +330,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	int e;
 	sqlite3_stmt *invq = NULL;
 	str_t inviter_caseid = {0};
+	str_t inviter_name = {0};
 	int64_t inviter_uid;
 
 	// check if user already exists
@@ -327,7 +343,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	str_t refcode = *cweb_get_segment(req, STR("refcode"));
 	sql_prepare_v2(
 		db,
-		"SELECT caseid, rowid FROM user WHERE refcode = ?;",
+		"SELECT caseid, rowid, fullname FROM user WHERE refcode = ?;",
 		-1,
 		&invq,
 		NULL
@@ -337,6 +353,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	if (e == SQLITE_ROW) {
 		inviter_caseid = sql_column_str(invq, 0);
 		inviter_uid = sqlite3_column_int64(invq, 1);
+		inviter_name = sql_column_str(invq, 2);
 	} else {
 		if (e != SQLITE_DONE)
 			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -350,6 +367,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 			res,
 			invite_login_prompt,
 			.inviter_caseid = inviter_caseid,
+			.inviter_name = inviter_name,
 		);
 	} else {
 		create_user(db, inviter_uid, sid);

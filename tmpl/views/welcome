@@ -1,7 +1,0 @@
-<%include tmpl/head>
-
-<h1>Welcome</h1>
-<hr>
-tODO: HOW IT WORKS, ETC
-
-<%include tmpl/foot>

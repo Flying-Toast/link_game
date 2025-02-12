@@ -1,7 +1,0 @@
-<%include tmpl/head>
-
-<h1>Accept Invitation?</h1>
-<p>TODO:FULLNAME (<%s inviter_caseid>) invited you.</p>
-<p>Do you want to <a href="/login">accept</a> it?</p>
-
-<%include tmpl/foot>

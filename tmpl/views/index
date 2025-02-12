@@ -1,6 +1,0 @@
-<%include tmpl/head>
-
-<h1>LinkChain</h1>
-<hr></hr>
-
-<%include tmpl/foot>
