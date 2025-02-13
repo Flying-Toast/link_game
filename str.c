@@ -101,3 +101,10 @@ void string_append(string_t *s, str_t stuff) {
 	memcpy(s->ptr + s->len, stuff.ptr, stuff.len);
 	s->len += stuff.len;
 }
+
+void string_free(string_t *s) {
+	free(s->ptr);
+	s->len = 0;
+	s->ptr = NULL;
+	s->cap = 0;
+}

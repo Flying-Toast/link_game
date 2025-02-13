@@ -103,6 +103,46 @@ out:
 	return ret;
 }
 
+// caller frees returned string
+static string_t render_graph_data(sqlite3 *db) {
+	sqlite3_stmt *s = NULL;
+	int e;
+	string_t ret = {0};
+	string_append(&ret, STR("let g = new graphology.Graph();"));
+
+	sql_prepare(db, STR("SELECT rowid, fullname, inviter FROM user;"), &s);
+
+	while ((e = sqlite3_step(s)) == SQLITE_ROW) {
+		int64_t uid = sqlite3_column_int64(s, 0);
+		str_t fullname = sql_column_str(s, 1);
+		int64_t inviter = sqlite3_column_int64(s, 2);
+
+		// TODO: escape double quotes and backslashes from fullname
+		assert(memchr(fullname.ptr, '"', fullname.len) == NULL);
+		assert(memchr(fullname.ptr, '\\', fullname.len) == NULL);
+
+		char buf[4096];
+		str_t item = { .ptr = buf };
+		item.len = snprintf(
+			buf,
+			sizeof(buf),
+			"g.addNode(\"%"PRId64"\",{label:\"%.*s\"});"
+			"g.addEdge(\"%"PRId64"\",\"%"PRId64"\",{});"
+			,uid
+			,PRSTR(fullname)
+			,inviter
+			,uid
+		);
+		assert(item.len < sizeof(buf));
+		string_append(&ret, item);
+	}
+	if (e != SQLITE_DONE)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	sqlite3_finalize(s);
+	return ret;
+}
+
 // pass uid=-1 for global counts
 static void refcounts(
 	sqlite3 *db,
@@ -252,6 +292,12 @@ static void logout_handler(struct request *req, struct response *res, sqlite3 *d
 static void graph_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
 	render_html(res, graph, 0);
+}
+
+static void graphdata_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req; (void)db;
+	assert(res->body.len == 0);
+	res->body = render_graph_data(db);
 }
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -458,11 +504,11 @@ int main(void) {
 		{ "/auth", auth_handler },
 		{ "/join/{refcode}", invite_handler },
 		{ "/static/style.css", cweb_static_handler },
-		{ "/static/vis.js", cweb_static_handler },
 
 		{ "/", index_handler, FILTERS(require_account) },
 		{ "/welcome", welcome_handler, FILTERS(require_account) },
 		{ "/graph", graph_handler, FILTERS(require_account) },
+		{ "/graphdata.js", graphdata_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){

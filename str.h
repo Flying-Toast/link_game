@@ -44,5 +44,6 @@ int64_t str_toi64(str_t s, bool *ok_out, unsigned base);
 
 void string_append(string_t *s, str_t stuff);
 void string_grow(string_t *s, size_t newcap);
+void string_free(string_t *s);
 
 #endif

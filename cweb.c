@@ -636,7 +636,7 @@ void cweb_static_handler(struct request *req, struct response *res, sqlite3 *db)
 	char *fnamez = str_dupz(fname);
 	struct stat sb;
 	if (stat(fnamez, &sb) == -1)
-		err(1, "stat");
+		err(1, "stat(%s)", fnamez);
 	int fd = open(fnamez, O_RDONLY);
 	if (fd == -1)
 		err(1, "open");
