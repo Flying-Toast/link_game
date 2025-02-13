@@ -17,6 +17,7 @@ const struct {
 } specspecs[] = {
 	{ "d", "int " },
 	{ "s", "str_t " },
+	{ "ld", "int64_t " },
 };
 
 static const char *spectype(str_t fmt) {
@@ -126,15 +127,16 @@ static void append_arg(str_t spec, str_t name) {
 	} else {
 		printf("\t{\n");
 		printf("\t\tchar buf[1024];\n");
+		printf("\t\tstr_t str = { .ptr = buf };\n");
 		printf(
-			"\t\tint nwrite = snprintf(buf, sizeof(buf), \"%%%.*s\", args->%.*s);\n"
+			"\t\tstr.len = snprintf(buf, sizeof(buf), \"%%%.*s\", args->%.*s);\n"
 			,(int)spec.len
 			,spec.ptr
 			,(int)name.len
 			,name.ptr
 		);
-		printf("\t\tassert((size_t)nwrite < sizeof(buf));\n");
-		printf("\t\tcweb_append(res, buf, nwrite);\n");
+		printf("\t\tassert(str.len < sizeof(buf));\n");
+		printf("\t\tcweb_append(res, str);\n");
 		printf("\t}\n");
 	}
 }

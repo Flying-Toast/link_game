@@ -43,6 +43,7 @@ h1 {
 	margin-top: 0;
 	padding: 4px 8px;
 	font-weight: normal;
+	text-align: center;
 }
 
 ul {
@@ -52,6 +53,10 @@ ul {
 
 p, ul {
 	margin-bottom: 0;
+}
+
+ul {
+	margin-top: 4px;
 }
 
 .main-wrapper {
@@ -64,4 +69,8 @@ p, ul {
 
 .graph-wrapper {
 	max-width: none;
+}
+
+.center {
+	text-align: center;
 }

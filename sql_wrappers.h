@@ -5,16 +5,14 @@
 #include <inttypes.h>
 #include "str.h"
 
-static inline void sql_prepare_v2(
+static inline void sql_prepare(
 	sqlite3 *db,
-	const char *zSql,
-	int nByte,
-	sqlite3_stmt **ppStmt,
-	const char **pzTail
+	str_t zSql,
+	sqlite3_stmt **ppStmt
 ) {
-	int err = sqlite3_prepare_v2(db, zSql, nByte, ppStmt, pzTail);
+	int err = sqlite3_prepare_v2(db, zSql.ptr, (int)zSql.len, ppStmt, NULL);
 	if (err != SQLITE_OK)
-		errx(1, "Error in query \"%.*s\": %s", (int)nByte, zSql, sqlite3_errmsg(db));
+		errx(1, "Error in query \"%.*s\": %s", (int)zSql.len, zSql.ptr, sqlite3_errmsg(db));
 }
 
 static inline void sql_bind_int64(sqlite3_stmt *s, int idx, sqlite3_int64 x) {

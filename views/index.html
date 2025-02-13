@@ -1,17 +1,38 @@
 <%include views/head>
 
+<div style="height:100%;display:flex;flex-direction:column;">
 <div class="inset main-wrapper">
 <div class="outset">
-	<h1>Link Experiment</h1>
+	<h1>The Link Experiment</h1>
 	<hr>
 	<p>Hi <%s myname>! Your invite code is <a href="/join/<%s refcode>">links.case.edu/join/<%s refcode></a>.</p>
 	<p>Spread your link to get points:</p>
 	<ul>
 		<li>A CWRU student who joins using your link gets you 1 point.</li>
-		<li>Faculty members give you 5 points.</li>
+		<li>Faculty members get you 5 points.</li>
 		<li>Eric Kaler is worth 100 points.</li>
 	</ul>
 </div>
+
+<div class="outset">
+	<h1>Stats</h1>
+	<hr>
+	<p><a href="/graph">Graph</a></p>
+	<p>There are <%ld g_total> total participants:</p>
+	<ul>
+		<li><%ld g_nstud> students</li>
+		<li><%ld g_nfac> faculty</li>
+		<li><%ld g_nkaler> Eric Kalers</li>
+	</ul>
+	<p><i>You</i> invited <%ld my_total> of them:</p>
+	<ul>
+		<li><%ld my_nstud> students</li>
+		<li><%ld my_nfac> faculty</li>
+		<li><%ld my_nkaler> Eric Kalers</li>
+	</ul>
+</div>
+</div>
+<div class="center" style="margin-top:auto;font-size:80%;padding-top:4px;">Made by <a href="mailto:srs266@case.edu">Simon</a></div>
 </div>
 
 <%include views/foot>

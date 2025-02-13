@@ -74,12 +74,10 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 		title_values = ldap_get_values_len(ldap, fent, "title");
 	}
 
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"UPDATE user SET fullname = ?, ldap_title = ?, firstname = ? WHERE caseid = ?;",
-		-1,
-		&s,
-		NULL
+		STR("UPDATE user SET fullname = ?, ldap_title = ?, firstname = ? WHERE caseid = ?;"),
+		&s
 	);
 	sql_bind_text(s, 1, fullname);
 	if (title_values && title_values[0] != NULL) {
@@ -103,6 +101,38 @@ out:
 	ldap_msgfree(resultchain);
 	ldap_unbind_ext_s(ldap, NULL, NULL);
 	return ret;
+}
+
+// pass uid=-1 for global counts
+static void refcounts(
+	sqlite3 *db,
+	int64_t uid,
+	int64_t *n_stud,
+	int64_t *n_fac,
+	int64_t *n_kaler
+) {
+	sqlite3_stmt *s = NULL;
+
+	sql_prepare(
+		db,
+		STR("SELECT\n"
+			"SUM(CASE WHEN ldap_title IS NULL THEN 1 ELSE 0 END),\n"
+			"SUM(CASE WHEN ldap_title IS NOT NULL AND caseid <> 'ewk42' THEN 1 ELSE 0 END),\n"
+			"SUM(CASE WHEN caseid = 'ewk42' THEN 1 ELSE 0 END)\n"
+			"FROM user WHERE inviter = ? OR ?;"),
+		&s
+	);
+	sql_bind_int64(s, 1, uid);
+	sql_bind_int64(s, 2, uid == -1);
+
+	if (sqlite3_step(s) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	*n_stud = sqlite3_column_int64(s, 0);
+	*n_fac = sqlite3_column_int64(s, 1);
+	*n_kaler = sqlite3_column_int64(s, 2);
+
+	sqlite3_finalize(s);
 }
 
 static void login_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -137,12 +167,12 @@ static int64_t gen_session(sqlite3 *db, char *caseid) {
 	sqlite3_stmt *del = NULL;
 	sqlite3_stmt *ins = NULL;
 
-	sql_prepare_v2(db, "DELETE FROM session WHERE caseid = ?;", -1, &del, NULL);
+	sql_prepare(db, STR("DELETE FROM session WHERE caseid = ?;"), &del);
 	sql_bind_text(del, 1, ztostr(caseid));
 	if (sqlite3_step(del) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
-	sql_prepare_v2(db, "INSERT INTO session (secret, caseid) VALUES (?, ?);", -1, &ins, NULL);
+	sql_prepare(db, STR("INSERT INTO session (secret, caseid) VALUES (?, ?);"), &ins);
 	sql_bind_int64(ins, 1, sid);
 	sql_bind_text(ins, 2, ztostr(caseid));
 	if (sqlite3_step(ins) != SQLITE_DONE)
@@ -228,12 +258,10 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	(void)req; (void)db;
 	sqlite3_stmt *q = NULL;
 
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"SELECT refcode, firstname FROM user WHERE rowid = ?;",
-		-1,
-		&q,
-		NULL
+		STR("SELECT refcode, firstname FROM user WHERE rowid = ?;"),
+		&q
 	);
 	sql_bind_int64(q, 1, req->uid);
 	if (sqlite3_step(q) != SQLITE_ROW)
@@ -241,7 +269,25 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	str_t refcode = sql_column_str(q, 0);
 	str_t firstname = sql_column_str(q, 1);
 
-	render_html(res, index, .refcode = refcode, .myname = firstname);
+	int64_t my_nstud, my_nfac, my_nkaler;
+	int64_t g_nstud, g_nfac, g_nkaler;
+	refcounts(db, req->uid, &my_nstud, &my_nfac, &my_nkaler);
+	refcounts(db, -1, &g_nstud, &g_nfac, &g_nkaler);
+
+	render_html(
+		res,
+		index,
+		.refcode = refcode,
+		.myname = firstname,
+		.my_nstud = my_nstud,
+		.my_nfac = my_nfac,
+		.my_nkaler = my_nkaler,
+		.my_total = my_nstud + my_nfac + my_nkaler,
+		.g_nstud = g_nstud,
+		.g_nfac = g_nfac,
+		.g_nkaler = g_nkaler,
+		.g_total = g_nstud + g_nfac + g_nkaler,
+	);
 	sqlite3_finalize(q);
 }
 
@@ -249,12 +295,10 @@ static void welcome_handler(struct request *req, struct response *res, sqlite3 *
 	(void)req; (void)db;
 	sqlite3_stmt *q = NULL;
 
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"SELECT firstname FROM user WHERE rowid = ?;",
-		-1,
-		&q,
-		NULL
+		STR("SELECT firstname FROM user WHERE rowid = ?;"),
+		&q
 	);
 	sql_bind_int64(q, 1, req->uid);
 	if (sqlite3_step(q) != SQLITE_ROW)
@@ -268,14 +312,12 @@ static void welcome_handler(struct request *req, struct response *res, sqlite3 *
 static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
 	sqlite3_stmt *q = NULL;
 	int64_t uid;
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"SELECT rowid FROM user\n"
+		STR("SELECT rowid FROM user\n"
 		"JOIN session ON session.caseid = user.caseid\n"
-		"WHERE session.secret = ?;",
-		-1,
-		&q,
-		NULL
+		"WHERE session.secret = ?;"),
+		&q
 	);
 	sql_bind_int64(q, 1, sid);
 
@@ -332,13 +374,11 @@ static void create_user(
 	};
 
 	sqlite3_stmt *ins = NULL;
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"INSERT INTO user (inviter, refcode, caseid)\n"
-		"VALUES (?, ?, (SELECT caseid FROM session WHERE secret = ?));",
-		-1,
-		&ins,
-		NULL
+		STR("INSERT INTO user (inviter, refcode, caseid)\n"
+		"VALUES (?, ?, (SELECT caseid FROM session WHERE secret = ?));"),
+		&ins
 	);
 	sql_bind_int64(ins, 1, inviter_uid);
 	sql_bind_text(ins, 2, refcodestr);
@@ -347,12 +387,10 @@ static void create_user(
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
 	sqlite3_stmt *caseid_q = NULL;
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"SELECT caseid FROM session WHERE secret = ?;",
-		-1,
-		&caseid_q,
-		NULL
+		STR("SELECT caseid FROM session WHERE secret = ?;"),
+		&caseid_q
 	);
 	sql_bind_int64(caseid_q, 1, current_sid);
 	if (sqlite3_step(caseid_q) != SQLITE_ROW)
@@ -380,12 +418,10 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	}
 
 	str_t refcode = *cweb_get_segment(req, STR("refcode"));
-	sql_prepare_v2(
+	sql_prepare(
 		db,
-		"SELECT rowid, fullname FROM user WHERE refcode = ?;",
-		-1,
-		&invq,
-		NULL
+		STR("SELECT rowid, fullname FROM user WHERE refcode = ?;"),
+		&invq
 	);
 	sql_bind_text(invq, 1, refcode);
 	e = sqlite3_step(invq);
