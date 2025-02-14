@@ -520,7 +520,9 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 
 	sql_prepare(
 		db,
-		STR("SELECT rowid, fullname FROM user WHERE caseid = ?;"),
+		STR("SELECT me.rowid, me.fullname, inviter.caseid, inviter.fullname FROM user AS me\n"
+		"JOIN user AS inviter ON inviter.rowid = me.inviter\n"
+		"WHERE me.caseid = ?;"),
 		&s
 	);
 	sql_bind_text(s, 1, caseid);
@@ -528,6 +530,8 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	int64_t uid = sqlite3_column_int64(s, 0);
 	str_t fullname = sql_column_str(s, 1);
+	str_t inviter_caseid = sql_column_str(s, 2);
+	str_t inviter_fullname = sql_column_str(s, 3);
 
 	int64_t nstud, nfac, nkaler;
 	refcounts(db, uid, &nstud, &nfac, &nkaler);
@@ -541,6 +545,8 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 		.nkaler = nkaler,
 		.totinvites = nstud + nfac + nkaler,
 		.caseid = caseid,
+		.inviter_caseid = inviter_caseid,
+		.inviter_fullname = inviter_fullname,
 	);
 	sqlite3_finalize(s);
 }
