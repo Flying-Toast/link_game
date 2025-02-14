@@ -16,11 +16,12 @@
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-#define SSO_SERVICE "https://fascinating-mochi-9ef846.netlify.app/"
 #ifdef RELEASE_BUILD
-#define PORT 80
+#	define PORT 80
+#	define SSO_SERVICE "https://symphonious-ganache-5f42c4.netlify.app/"
 #else
-#define PORT 8080
+#	define PORT 8080
+#	define SSO_SERVICE "https://fascinating-mochi-9ef846.netlify.app/"
 #endif
 
 static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
