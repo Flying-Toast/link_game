@@ -655,7 +655,7 @@ int main(int argc, char **argv) {
 	) {
 		err(1, "unveil");
 	}
-	if (pledge("wpath rpath cpath stdio proc id inet dns", "") == -1)
+	if (pledge("wpath rpath cpath flock stdio proc id inet dns", "") == -1)
 		err(1, "pledge");
 #endif
 
