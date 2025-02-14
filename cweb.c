@@ -492,6 +492,11 @@ void cweb_run(struct cweb_args *args) {
 		err(1, "sigaction");
 
 	int listenfd = tcpsock(args->port);
+	uid_t uid = getuid();
+	if (setuid(uid) == -1)
+		err(1, "setuid");
+	if (uid == 0)
+		errx(1, "refusing to run as root");
 
 	for (;;) {
 		int connfd = accept(listenfd, NULL, NULL);

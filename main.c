@@ -2,8 +2,10 @@
 #include <assert.h>
 #include <err.h>
 #include <ldap.h>
+#include <unistd.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include "cweb.h"
@@ -14,6 +16,11 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 #define SSO_SERVICE "https://fascinating-mochi-9ef846.netlify.app/"
+#ifdef RELEASE_BUILD
+#define PORT 80
+#else
+#define PORT 8080
+#endif
 
 static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	int e;
@@ -398,7 +405,7 @@ static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
 	return uid;
 }
 
-static int64_t getsid(struct request *req) {
+static int64_t getsessid(struct request *req) {
 	const str_t *sid_str = cweb_get_cookie(req, STR("s"));
 	if (sid_str == NULL || sid_str->len == 0)
 		return -1;
@@ -411,7 +418,7 @@ static int64_t getsid(struct request *req) {
 }
 
 static enum filter_flow require_account(struct request *req, struct response *res, sqlite3 *db) {
-	int64_t sid = getsid(req);
+	int64_t sid = getsessid(req);
 	if (sid == -1) {
 		cweb_set_cookie(res, STR("return"), req->uri);
 		render_html(res, login_prompt, 0);
@@ -474,7 +481,7 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	int64_t inviter_uid;
 
 	// check if user already exists
-	int64_t sid = getsid(req);
+	int64_t sid = getsessid(req);
 	if (sid != -1 && uid_from_sid(db, sid) != 0) {
 		render_html(res, already_joined, 0);
 		goto out;
@@ -570,7 +577,7 @@ int main(void) {
 	cweb_run(&(struct cweb_args){
 		.route_specs = routes,
 		.n_route_specs = ARRAY_LEN(routes),
-		.port = 8080,
+		.port = PORT,
 		.db_path = "db.sqlite3"
 	});
 
