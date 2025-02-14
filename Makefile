@@ -1,6 +1,6 @@
 CC=clang
-CFLAGS=-Wall -Wextra -Wpedantic -Wno-missing-field-initializers -std=c99 -g \
-       -D _POSIX_C_SOURCE=200809L -D _DEFAULT_SOURCE -fsanitize=undefined
+CFLAGS=-Wall -Wextra -Wpedantic -Wno-missing-field-initializers -Wno-overlength-strings \
+       -std=c99 -g -D _POSIX_C_SOURCE=200809L -D _DEFAULT_SOURCE -fsanitize=undefined
 LIBS=-lcurl -lldap
 TEMPLATES!=echo views/*.html
 OBJECTS=cweb.o main.o str.o

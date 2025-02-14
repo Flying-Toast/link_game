@@ -1,0 +1,144 @@
+<%include views/head>
+<div class="inset main-wrapper tree-wrapper" style="height:100%;">
+	<div class="outset">
+		<h1>Invite Tree</h1>
+		<hr>
+		<p>Pinch/scroll to zoom, drag to pan. <a href="/">Home</a>.</p>
+	</div>
+	<div id="container" class="outset" style="height:100%;"></div>
+</div>
+<script src="/static/d3.js"></script>
+<script src="/treedata.js"></script>
+<script>
+	let dx = 10;
+	let dy = 154;
+	let width = 600;
+	let margin = {top: 10, right: 120, bottom: 10, left: 40};
+	let tree = d3.tree().nodeSize([dx, dy]);
+	let diagonal = d3.linkHorizontal().x(d => d.y).y(d => d.x);
+
+	function chart() {
+		const zoom = d3.zoom()
+			.scaleExtent([1, 40])
+			.on("zoom", zoomed);
+
+		const root = d3.hierarchy(inviteData);
+
+		root.x0 = dy / 2;
+		root.y0 = 0;
+		root.descendants().forEach((d, i) => {
+			d.id = i;
+			d._children = d.children;
+		});
+
+		const svg = d3.create("svg")
+			.attr("viewBox", [-margin.left, -margin.top, width, dx])
+			.style("font", "10px sans-serif")
+			.style("user-select", "none");
+
+		const gLink = svg.append("g")
+			.attr("fill", "none")
+			.attr("stroke", "#555")
+			.attr("stroke-opacity", 0.4)
+			.attr("stroke-width", 1.5);
+
+		const gNode = svg.append("g")
+			.attr("cursor", "pointer")
+			.attr("pointer-events", "all");
+		svg.call(zoom);
+		function zoomed() {
+			gNode.attr("transform", d3.event.transform);
+			gLink.attr("transform", d3.event.transform);
+		}
+
+		function update(source) {
+			const duration = d3.event && d3.event.altKey ? 2500 : 250;
+			const nodes = root.descendants().reverse();
+			const links = root.links();
+
+			tree(root);
+
+			let left = root;
+			let right = root;
+			root.eachBefore(node => {
+				if (node.x < left.x) left = node;
+				if (node.x > right.x) right = node;
+			});
+
+			const height = 100;
+
+			const transition = svg.transition()
+				.duration(duration)
+				.attr("viewBox", [-margin.left, left.x - margin.top, width, height])
+				.tween("resize", window.ResizeObserver ? null : () => () => svg.dispatch("toggle"));
+
+			const node = gNode.selectAll("g").data(nodes, d => d.id);
+
+			const nodeEnter = node.enter().append("g")
+				.attr("transform", d => `translate(${source.y0},${source.x0})`)
+				.attr("fill-opacity", 0)
+				.attr("stroke-opacity", 0)
+				.on("click", (event, d) => {
+					d.children = d.children ? null : d._children;
+					update(d);
+				});
+
+			nodeEnter.append("circle")
+				.attr("r", 2.5)
+				.attr("fill", d => d._children ? "#555" : "#999")
+				.attr("stroke-width", 10);
+
+			nodeEnter.append("text")
+				.attr("dy", "0.31em")
+				.attr("x", d => d._children ? -6 : 6)
+				.attr("text-anchor", d => d._children ? "end" : "start")
+				.text(d => d.data.name)
+				.clone(true).lower()
+				.attr("stroke-linejoin", "round")
+				.attr("stroke-width", 3)
+				.attr("stroke", "white");
+
+			const nodeUpdate = node.merge(nodeEnter).transition(transition)
+				.attr("transform", d => `translate(${d.y},${d.x})`)
+				.attr("fill-opacity", 1)
+				.attr("stroke-opacity", 1);
+
+			const nodeExit = node.exit().transition(transition).remove()
+				.attr("transform", d => `translate(${d.y},${d.x})`)
+				.attr("fill-opacity", 0)
+				.attr("stroke-opacity", 0);
+
+			const link = gLink.selectAll("path").data(links, d => d.target.id);
+
+			const linkEnter = link.enter().append("path")
+				.attr("d", d => {
+					const o = {x: d.x0, y: d.y0};
+					return diagonal({source: o, target: o});
+				});
+
+			link.merge(linkEnter).transition(transition)
+				.attr("d", diagonal);
+
+			link.exit().transition(transition).remove()
+				.attr("d", d => {
+					const o = {x: source.x, y: source.y};
+					return diagonal({source: o, target: o});
+				});
+
+			root.eachBefore(d => {
+				d.x0 = d.x;
+				d.y0 = d.y;
+			});
+		}
+
+		update(root);
+
+		let ret = svg.node();
+		ret.style.width = "100%";
+		ret.style.height = "100%";
+		return ret;
+	}
+
+	document.getElementById("container").append(chart());
+</script>
+<%include views/foot>

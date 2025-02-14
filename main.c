@@ -104,13 +104,13 @@ out:
 }
 
 // caller frees returned string
-static string_t render_graph_data(sqlite3 *db) {
+static string_t render_tree_data(sqlite3 *db) {
 	sqlite3_stmt *s = NULL;
 	int e;
 	string_t ret = {0};
-	string_append(&ret, STR("let g = new graphology.Graph();"));
+	string_append(&ret, STR("let inviteData=null;let m=new Map();function a(uid,fullname,inviterUid){let o={name:fullname,children:[]};m.set(uid,o);if(uid==inviterUid){inviteData=o;}else{m.get(inviterUid).children.push(o);}}"));
 
-	sql_prepare(db, STR("SELECT rowid, fullname, inviter FROM user;"), &s);
+	sql_prepare(db, STR("SELECT rowid, fullname, inviter FROM user ORDER BY rowid ASC;"), &s);
 
 	while ((e = sqlite3_step(s)) == SQLITE_ROW) {
 		int64_t uid = sqlite3_column_int64(s, 0);
@@ -126,12 +126,10 @@ static string_t render_graph_data(sqlite3 *db) {
 		item.len = snprintf(
 			buf,
 			sizeof(buf),
-			"g.addNode(\"%"PRId64"\",{label:\"%.*s\"});"
-			"g.addEdge(\"%"PRId64"\",\"%"PRId64"\",{});"
+			"a(%"PRId64",\"%.*s\",%"PRId64");"
 			,uid
 			,PRSTR(fullname)
 			,inviter
-			,uid
 		);
 		assert(item.len < sizeof(buf));
 		string_append(&ret, item);
@@ -289,15 +287,15 @@ static void logout_handler(struct request *req, struct response *res, sqlite3 *d
 	render_html(res, logout, 0);
 }
 
-static void graph_handler(struct request *req, struct response *res, sqlite3 *db) {
+static void tree_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
-	render_html(res, graph, 0);
+	render_html(res, tree, 0);
 }
 
-static void graphdata_handler(struct request *req, struct response *res, sqlite3 *db) {
+static void treedata_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req; (void)db;
 	assert(res->body.len == 0);
-	res->body = render_graph_data(db);
+	res->body = render_tree_data(db);
 }
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -504,11 +502,12 @@ int main(void) {
 		{ "/auth", auth_handler },
 		{ "/join/{refcode}", invite_handler },
 		{ "/static/style.css", cweb_static_handler },
+		{ "/static/d3.js", cweb_static_handler },
 
 		{ "/", index_handler, FILTERS(require_account) },
 		{ "/welcome", welcome_handler, FILTERS(require_account) },
-		{ "/graph", graph_handler, FILTERS(require_account) },
-		{ "/graphdata.js", graphdata_handler, FILTERS(require_account) },
+		{ "/tree", tree_handler, FILTERS(require_account) },
+		{ "/treedata.js", treedata_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){
