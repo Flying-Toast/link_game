@@ -14,14 +14,6 @@ bool str_eq(str_t a, str_t b) {
 	return true;
 }
 
-bool str_eqz(str_t a, const char *b) {
-	for (size_t i = 0; i < a.len; i++) {
-		if (b[i] == '\0' || a.ptr[i] != b[i])
-			return false;
-	}
-	return true;
-}
-
 bool str_caseqz(str_t a, const char *b) {
 	for (size_t i = 0; i < a.len; i++) {
 		if (b[i] == '\0' || tolower(a.ptr[i]) != tolower(b[i]))

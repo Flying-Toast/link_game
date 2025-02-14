@@ -280,7 +280,7 @@ static bool parse_request(struct request *req, char *buf, size_t bufsiz) {
 	buf++;
 	bufsiz--;
 
-	if (str_eqz(method_str, "GET"))
+	if (str_eq(method_str, STR("GET")))
 		req->method = METHOD_GET;
 	else
 		return false;
