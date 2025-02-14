@@ -26,6 +26,7 @@
 
 static const char *d_arg;
 static const char *s_arg;
+static bool z_flag;
 
 static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	int e;
@@ -610,13 +611,16 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 
 static void opts(int argc, char **argv) {
 	int ch;
-	while ((ch = getopt(argc, argv, "d:s:")) != -1) {
+	while ((ch = getopt(argc, argv, "d:s:z")) != -1) {
 		switch (ch) {
 		case 'd':
 			d_arg = optarg;
 			break;
 		case 's':
 			s_arg = optarg;
+			break;
+		case 'z':
+			z_flag = true;
 			break;
 		default:
 			errx(1, "unknown flag %c", ch);
@@ -634,6 +638,9 @@ int main(int argc, char **argv) {
 		errx(1, "missing -d db_path");
 	if (s_arg == NULL)
 		errx(1, "missing -s static_path");
+
+	if (z_flag && daemon(1, 1))
+		err(1, "daemon");
 
 	int static_dir = open(s_arg, O_DIRECTORY);
 	if (static_dir == -1)
