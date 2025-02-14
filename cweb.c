@@ -17,6 +17,8 @@
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+static int cweb_static_dir;
+
 struct route {
 	struct route_spec *spec;
 	size_t n_segments;
@@ -480,6 +482,8 @@ static void parse_route_spec_path(const char *path, struct route *route) {
 }
 
 void cweb_run(struct cweb_args *args) {
+	cweb_static_dir = args->static_dir;
+
 	struct route *routes = calloc(args->n_route_specs, sizeof(*routes));
 	for (size_t i = 0; i < args->n_route_specs; i++) {
 		parse_route_spec_path(args->route_specs[i].path, routes + i);
@@ -642,9 +646,9 @@ void cweb_static_handler(struct request *req, struct response *res, sqlite3 *db)
 
 	char *fnamez = str_dupz(fname);
 	struct stat sb;
-	if (stat(fnamez, &sb) == -1)
-		err(1, "stat(%s)", fnamez);
-	int fd = open(fnamez, O_RDONLY);
+	if (fstatat(cweb_static_dir, fnamez, &sb, 0) == -1)
+		err(1, "fstatat(%s)", fnamez);
+	int fd = openat(cweb_static_dir, fnamez, O_RDONLY);
 	if (fd == -1)
 		err(1, "open");
 	assert(res->body.len == 0);

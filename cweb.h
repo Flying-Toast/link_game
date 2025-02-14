@@ -73,9 +73,10 @@ struct cweb_args {
 	size_t n_route_specs;
 	struct route_spec *route_specs;
 	uint16_t port;
+	int static_dir;
 
 	// optional:
-	char *db_path;
+	const char *db_path;
 	filter_func_t *global_filters;
 };
 

@@ -24,6 +24,9 @@
 #	define SSO_SERVICE "https://fascinating-mochi-9ef846.netlify.app/"
 #endif
 
+static const char *d_arg;
+static const char *s_arg;
+
 static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 	int e;
 	bool ret = false;
@@ -605,9 +608,39 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 	sqlite3_finalize(s);
 }
 
-int main(void) {
+static void opts(int argc, char **argv) {
+	int ch;
+	while ((ch = getopt(argc, argv, "d:s:")) != -1) {
+		switch (ch) {
+		case 'd':
+			d_arg = optarg;
+			break;
+		case 's':
+			s_arg = optarg;
+			break;
+		default:
+			errx(1, "unknown flag %c", ch);
+			break;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+}
+
+int main(int argc, char **argv) {
+	opts(argc, argv);
+
+	if (d_arg == NULL)
+		errx(1, "missing -d db_path");
+	if (s_arg == NULL)
+		errx(1, "missing -s static_path");
+
+	int static_dir = open(s_arg, O_DIRECTORY);
+	if (static_dir == -1)
+		err(1, "open(static_path)");
+
 #ifdef __OpenBSD__
-	if (unveil("static", "r") == -1 || unveil("db.sqlite3", "rwc") == -1 || unveil(NULL, NULL) == -1)
+	if (unveil(s_arg, "r") == -1 || unveil(d_arg, "rwc") == -1 || unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 	if (pledge("wpath rpath cpath stdio proc id inet dns", "") == -1)
 		err(1, "pledge");
@@ -618,8 +651,8 @@ int main(void) {
 		{ "/logout", logout_handler },
 		{ "/auth", auth_handler },
 		{ "/join/{refcode}", invite_handler },
-		{ "/static/style.css", cweb_static_handler },
-		{ "/static/d3.js", cweb_static_handler },
+		{ "/style.css", cweb_static_handler },
+		{ "/d3.js", cweb_static_handler },
 
 		{ "/", index_handler, FILTERS(require_account) },
 		{ "/welcome", welcome_handler, FILTERS(require_account) },
@@ -633,7 +666,8 @@ int main(void) {
 		.route_specs = routes,
 		.n_route_specs = ARRAY_LEN(routes),
 		.port = PORT,
-		.db_path = "db.sqlite3"
+		.db_path = d_arg,
+		.static_dir = static_dir,
 	});
 
 	return 5;
