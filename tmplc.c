@@ -57,7 +57,7 @@ char *read_file(const char *fname) {
 }
 
 static size_t next_placeholder(const char *ptr) {
-	ssize_t dist = 0;
+	size_t dist = 0;
 	while (ptr[dist] && strncmp(ptr + dist, "<%", 2) != 0)
 		dist++;
 	return dist;

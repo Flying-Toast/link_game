@@ -77,26 +77,23 @@
 			const nodeEnter = node.enter().append("g")
 				.attr("transform", d => `translate(${source.y0},${source.x0})`)
 				.attr("fill-opacity", 0)
-				.attr("stroke-opacity", 0)
-				.on("click", (event, d) => {
-					d.children = d.children ? null : d._children;
-					update(d);
-				});
+				.attr("stroke-opacity", 0);
 
 			nodeEnter.append("circle")
 				.attr("r", 2.5)
 				.attr("fill", d => d._children ? "#555" : "#999")
 				.attr("stroke-width", 10);
 
-			nodeEnter.append("text")
+			nodeEnter.append("a")
+				.attr("href", d => `/profile/${d.data.c}`)
+				.append("text")
+				.attr("fill", "blue")
+				.attr("text-decoration", "underline")
 				.attr("dy", "0.31em")
 				.attr("x", d => d._children ? -6 : 6)
 				.attr("text-anchor", d => d._children ? "end" : "start")
-				.text(d => d.data.name)
-				.clone(true).lower()
-				.attr("stroke-linejoin", "round")
-				.attr("stroke-width", 3)
-				.attr("stroke", "white");
+				.text(d => d.data.n)
+				.clone(true).lower();
 
 			const nodeUpdate = node.merge(nodeEnter).transition(transition)
 				.attr("transform", d => `translate(${d.y},${d.x})`)

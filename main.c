@@ -108,14 +108,15 @@ static string_t render_tree_data(sqlite3 *db) {
 	sqlite3_stmt *s = NULL;
 	int e;
 	string_t ret = {0};
-	string_append(&ret, STR("let inviteData=null;let m=new Map();function a(uid,fullname,inviterUid){let o={name:fullname,children:[]};m.set(uid,o);if(uid==inviterUid){inviteData=o;}else{m.get(inviterUid).children.push(o);}}"));
+	string_append(&ret, STR("let inviteData=null;let m=new Map();function a(uid,fullname,inviterUid,caseid){let o={n:fullname,children:[],c:caseid};m.set(uid,o);if(uid==inviterUid){inviteData=o;}else{m.get(inviterUid).children.push(o);}}"));
 
-	sql_prepare(db, STR("SELECT rowid, fullname, inviter FROM user ORDER BY rowid ASC;"), &s);
+	sql_prepare(db, STR("SELECT rowid, fullname, inviter, caseid FROM user ORDER BY rowid ASC;"), &s);
 
 	while ((e = sqlite3_step(s)) == SQLITE_ROW) {
 		int64_t uid = sqlite3_column_int64(s, 0);
 		str_t fullname = sql_column_str(s, 1);
 		int64_t inviter = sqlite3_column_int64(s, 2);
+		str_t caseid = sql_column_str(s, 3);
 
 		// TODO: escape double quotes and backslashes from fullname
 		assert(memchr(fullname.ptr, '"', fullname.len) == NULL);
@@ -126,10 +127,11 @@ static string_t render_tree_data(sqlite3 *db) {
 		item.len = snprintf(
 			buf,
 			sizeof(buf),
-			"a(%"PRId64",\"%.*s\",%"PRId64");"
+			"a(%"PRId64",\"%.*s\",%"PRId64",\"%.*s\");"
 			,uid
 			,PRSTR(fullname)
 			,inviter
+			,PRSTR(caseid)
 		);
 		assert(item.len < sizeof(buf));
 		string_append(&ret, item);
@@ -222,7 +224,6 @@ static int64_t gen_session(sqlite3 *db, char *caseid) {
 }
 
 static void auth_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)db;
 	const str_t *ticket = cweb_get_query(req, STR("ticket"));
 	if (!ticket) {
 		bad_request(res);
@@ -293,13 +294,12 @@ static void tree_handler(struct request *req, struct response *res, sqlite3 *db)
 }
 
 static void treedata_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)req; (void)db;
+	(void)req;
 	assert(res->body.len == 0);
 	res->body = render_tree_data(db);
 }
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)req; (void)db;
 	sqlite3_stmt *q = NULL;
 
 	sql_prepare(
@@ -336,7 +336,6 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 }
 
 static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)req; (void)db;
 	sqlite3_stmt *q = NULL;
 
 	sql_prepare(
@@ -390,7 +389,6 @@ static int64_t getsid(struct request *req) {
 }
 
 static enum filter_flow require_account(struct request *req, struct response *res, sqlite3 *db) {
-	(void)db;
 	int64_t sid = getsid(req);
 	if (sid == -1) {
 		cweb_set_cookie(res, STR("return"), req->uri);
@@ -448,7 +446,6 @@ static void create_user(
 }
 
 static void invite_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)req; (void)db;
 	int e;
 	sqlite3_stmt *invq = NULL;
 	str_t inviter_name = {0};
@@ -495,6 +492,37 @@ out:
 	sqlite3_finalize(invq);
 }
 
+void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
+	sqlite3_stmt *s = NULL;
+	str_t caseid = *cweb_get_segment(req, STR("caseid"));
+
+	sql_prepare(
+		db,
+		STR("SELECT rowid, fullname FROM user WHERE caseid = ?;"),
+		&s
+	);
+	sql_bind_text(s, 1, caseid);
+	if (sqlite3_step(s) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	int64_t uid = sqlite3_column_int64(s, 0);
+	str_t fullname = sql_column_str(s, 1);
+
+	int64_t nstud, nfac, nkaler;
+	refcounts(db, uid, &nstud, &nfac, &nkaler);
+
+	render_html(
+		res,
+		profile,
+		.myname = fullname,
+		.nstud = nstud,
+		.nfac = nfac,
+		.nkaler = nkaler,
+		.totinvites = nstud + nfac + nkaler,
+		.caseid = caseid,
+	);
+	sqlite3_finalize(s);
+}
+
 int main(void) {
 	struct route_spec routes[] = {
 		{ "/login", login_handler },
@@ -508,6 +536,7 @@ int main(void) {
 		{ "/welcome", welcome_handler, FILTERS(require_account) },
 		{ "/tree", tree_handler, FILTERS(require_account) },
 		{ "/treedata.js", treedata_handler, FILTERS(require_account) },
+		{ "/profile/{caseid}", profile_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){
