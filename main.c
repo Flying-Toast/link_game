@@ -387,6 +387,25 @@ static void welcome_handler(struct request *req, struct response *res, sqlite3 *
 	sqlite3_finalize(q);
 }
 
+static int64_t sid_valid(sqlite3 *db, int64_t sid) {
+	sqlite3_stmt *q = NULL;
+	sql_prepare(
+		db,
+		STR("SELECT count(*) FROM session WHERE secret = ?;"),
+		&q
+	);
+	sql_bind_int64(q, 1, sid);
+
+	int e = sqlite3_step(q);
+	if (e != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	int64_t nsessions = sqlite3_column_int64(q, 0);
+
+	sqlite3_finalize(q);
+	return nsessions != 0;
+}
+
 static int64_t uid_from_sid(sqlite3 *db, int64_t sid) {
 	sqlite3_stmt *q = NULL;
 	int64_t uid;
@@ -434,7 +453,12 @@ static enum filter_flow require_account(struct request *req, struct response *re
 	if ((req->uid = uid_from_sid(db, sid)) != 0) {
 		return FILTER_CONTINUE;
 	} else {
-		render_html(res, account_needed, 0);
+		if (sid_valid(db, sid)) {
+			render_html(res, account_needed, 0);
+		} else {
+			cweb_delete_cookie(res, STR("s"));
+			redirect(res, STR("/"));
+		}
 		return FILTER_HALT;
 	}
 }
