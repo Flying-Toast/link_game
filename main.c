@@ -559,6 +559,13 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 }
 
 int main(void) {
+#ifdef __OpenBSD__
+	if (unveil("static", "r") == -1 || unveil("db.sqlite3", "rw") == -1 || unveil(NULL, NULL) == -1)
+		err(1, "unveil");
+	if (pledge("wpath rpath stdio proc id inet", "") == -1)
+		err(1, "pledge");
+#endif
+
 	struct route_spec routes[] = {
 		{ "/login", login_handler },
 		{ "/logout", logout_handler },
