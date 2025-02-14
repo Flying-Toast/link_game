@@ -24,9 +24,8 @@
 #	define SSO_SERVICE "https://fascinating-mochi-9ef846.netlify.app/"
 #endif
 
-static const char *d_arg;
+static const char *w_arg;
 static const char *e_arg;
-static const char *s_arg;
 static bool z_flag;
 
 static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
@@ -612,16 +611,13 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 
 static void opts(int argc, char **argv) {
 	int ch;
-	while ((ch = getopt(argc, argv, "d:e:s:z")) != -1) {
+	while ((ch = getopt(argc, argv, "e:zw:")) != -1) {
 		switch (ch) {
-		case 'd':
-			d_arg = optarg;
-			break;
 		case 'e':
 			e_arg = optarg;
 			break;
-		case 's':
-			s_arg = optarg;
+		case 'w':
+			w_arg = optarg;
 			break;
 		case 'z':
 			z_flag = true;
@@ -638,10 +634,10 @@ static void opts(int argc, char **argv) {
 int main(int argc, char **argv) {
 	opts(argc, argv);
 
-	if (d_arg == NULL)
-		errx(1, "missing -d db_path");
-	if (s_arg == NULL)
-		errx(1, "missing -s static_path");
+	if (w_arg == NULL)
+		errx(1, "missing -d working_dir");
+	if (chdir(w_arg) == -1)
+		err(1, "chdir");
 
 	if (z_flag && daemon(1, 1))
 		err(1, "daemon");
@@ -654,13 +650,12 @@ int main(int argc, char **argv) {
 			err(1, "dup2(efd)");
 	}
 
-	int static_dir = open(s_arg, O_DIRECTORY);
+	int static_dir = open("static", O_DIRECTORY);
 	if (static_dir == -1)
-		err(1, "open(static_path)");
+		err(1, "open(\"static\")");
 
 #ifdef __OpenBSD__
-	if (unveil(s_arg, "r") == -1
-		|| unveil(d_arg, "rwc") == -1
+	if (unveil(".", "rwc") == -1
 		|| unveil("/etc/resolv.conf", "r") == -1
 		|| unveil("/etc/ssl", "r") == -1
 		|| unveil(NULL, NULL) == -1
@@ -691,7 +686,7 @@ int main(int argc, char **argv) {
 		.route_specs = routes,
 		.n_route_specs = ARRAY_LEN(routes),
 		.port = PORT,
-		.db_path = d_arg,
+		.db_path = "db.sqlite3",
 		.static_dir = static_dir,
 	});
 

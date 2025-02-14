@@ -9,7 +9,7 @@ HEADERS=cweb.h sql_wrappers.h str.h
 
 .PHONY: run
 run: $(SERVEREXE)
-	./$(SERVEREXE) -d dev_db.sqlite3 -s static
+	./$(SERVEREXE) -w .
 
 .PHONY: install
 install: release
