@@ -301,6 +301,7 @@ static void treedata_handler(struct request *req, struct response *res, sqlite3 
 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
 	sqlite3_stmt *q = NULL;
+	sqlite3_stmt *recents_q = NULL;
 
 	sql_prepare(
 		db,
@@ -312,6 +313,22 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t refcode = sql_column_str(q, 0);
 	str_t firstname = sql_column_str(q, 1);
+
+	sql_prepare(
+		db,
+		STR("SELECT joiner.caseid, joiner.fullname, inviter.caseid, inviter.fullname\n"
+		"FROM user AS joiner\n"
+		"JOIN user AS inviter ON inviter.rowid = joiner.inviter\n"
+		"ORDER BY joiner.rowid DESC\n"
+		"LIMIT 1"),
+		&recents_q
+	);
+	if (sqlite3_step(recents_q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t joinercaseid = sql_column_str(recents_q, 0);
+	str_t joinername = sql_column_str(recents_q, 1);
+	str_t invitercaseid = sql_column_str(recents_q, 2);
+	str_t invitername = sql_column_str(recents_q, 3);
 
 	int64_t my_nstud, my_nfac, my_nkaler;
 	int64_t g_nstud, g_nfac, g_nkaler;
@@ -331,8 +348,13 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 		.g_nfac = g_nfac,
 		.g_nkaler = g_nkaler,
 		.g_total = g_nstud + g_nfac + g_nkaler,
+		.recentinvitercaseid = invitercaseid,
+		.recentinvitername = invitername,
+		.recentjoinercaseid = joinercaseid,
+		.recentjoinername = joinername,
 	);
 	sqlite3_finalize(q);
+	sqlite3_finalize(recents_q);
 }
 
 static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
