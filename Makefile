@@ -29,7 +29,6 @@ main.o: tmplfuncs.gen
 
 $(SERVEREXE): $(OBJECTS)
 	$(CC) $(CFLAGS) `pkg-config --libs $(LIBS)` -o $(SERVEREXE) $(OBJECTS)
-	echo $(CC) $(CFLAGS) `pkg-config --libs $(LIBS)` -o $(SERVEREXE) $(OBJECTS)
 
 tmplc: tmplc.o str.o
 	$(CC) $(CFLAGS) tmplc.o str.o -o tmplc
