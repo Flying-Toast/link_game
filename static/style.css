@@ -46,6 +46,10 @@ h1 {
 	text-align: center;
 }
 
+a, a:visited {
+	color: blue;
+}
+
 ul {
 	list-style: square;
 	padding-left: 30px;
