@@ -3,7 +3,7 @@
 	<div class="outset">
 		<h1>Invite Tree</h1>
 		<hr>
-		<p>Pinch/scroll to zoom, drag to pan. <a href="/">Home</a>.</p>
+		<p>Pinch/scroll to zoom, drag to pan. Click a name to see their profile. <a href="/">Home</a>.</p>
 	</div>
 	<div id="container" class="outset" style="height:100%;"></div>
 </div>
@@ -11,7 +11,7 @@
 <script src="/treedata.js"></script>
 <script>
 	let dx = 10;
-	let dy = 154;
+	let dy = 50;
 	let width = 600;
 	let margin = {top: 10, right: 120, bottom: 10, left: 40};
 	let tree = d3.tree().nodeSize([dx, dy]);
@@ -42,9 +42,7 @@
 			.attr("stroke-opacity", 0.4)
 			.attr("stroke-width", 1.5);
 
-		const gNode = svg.append("g")
-			.attr("cursor", "pointer")
-			.attr("pointer-events", "all");
+		const gNode = svg.append("g");
 		svg.call(zoom);
 		function zoomed() {
 			gNode.attr("transform", d3.event.transform);
