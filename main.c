@@ -581,7 +581,7 @@ static void events_handler(struct request *req, struct response *res, sqlite3 *d
 			buf,
 			sizeof(buf),
 			"%"PRId64": %s - %.*s invited %.*s (%.*s)\n"
-			,n
+			,n++
 			,datebuf
 			,PRSTR(invitername)
 			,PRSTR(joinername)
