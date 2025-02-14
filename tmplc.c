@@ -191,7 +191,7 @@ static void do_args(const char *basename, char *buf) {
 		nargs++;
 	}
 	if (nargs == 0)
-		printf("\tint __unused;\n");
+		printf("\tint __tmpl_unused;\n");
 	printf("};\n");
 
 	free(seen_args);

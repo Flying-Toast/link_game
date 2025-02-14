@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "sqlite3.h"
+#include <sqlite3.h>
 #include "str.h"
 
 #define FILTERS(...) (filter_func_t[]){ __VA_ARGS__, NULL }

@@ -2,13 +2,13 @@
 #include <assert.h>
 #include <time.h>
 #include <err.h>
-#include <ldap.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ldap.h>
 #include "cweb.h"
 #include "sql_wrappers.h"
 #include "tmplfuncs.gen"
@@ -607,9 +607,9 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 
 int main(void) {
 #ifdef __OpenBSD__
-	if (unveil("static", "r") == -1 || unveil("db.sqlite3", "rw") == -1 || unveil(NULL, NULL) == -1)
+	if (unveil("static", "r") == -1 || unveil("db.sqlite3", "rwc") == -1 || unveil(NULL, NULL) == -1)
 		err(1, "unveil");
-	if (pledge("wpath rpath stdio proc id inet", "") == -1)
+	if (pledge("wpath rpath cpath stdio proc id inet dns", "") == -1)
 		err(1, "pledge");
 #endif
 

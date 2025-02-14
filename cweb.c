@@ -1,5 +1,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/types.h>
 #include <assert.h>
 #include <ctype.h>
 #include <err.h>

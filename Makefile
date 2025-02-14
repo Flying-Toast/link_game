@@ -1,7 +1,7 @@
 CC=clang
-CFLAGS=-Wall -Wextra -Wpedantic -Wno-missing-field-initializers -Wno-overlength-strings \
-       -std=c99 -g -D _POSIX_C_SOURCE=200809L -D _DEFAULT_SOURCE -fsanitize=undefined
-LIBS=-lcurl -lldap
+LIBS=ldap libcurl sqlite3
+CFLAGS=-Wall -Wextra -Wpedantic -Wno-missing-field-initializers -Wno-overlength-strings -g \
+       `pkg-config --cflags $(LIBS)`
 SERVEREXE=linkserver
 TEMPLATES!=echo views/*.html
 OBJECTS=cweb.o main.o str.o
@@ -22,8 +22,9 @@ $(OBJECTS): $(HEADERS)
 
 main.o: tmplfuncs.gen
 
-$(SERVEREXE): $(OBJECTS) sqlite3.o
-	$(CC) $(CFLAGS) $(LIBS) -o $(SERVEREXE) $(OBJECTS) sqlite3.o
+$(SERVEREXE): $(OBJECTS)
+	$(CC) $(CFLAGS) `pkg-config --libs $(LIBS)` -o $(SERVEREXE) $(OBJECTS)
+	echo $(CC) $(CFLAGS) `pkg-config --libs $(LIBS)` -o $(SERVEREXE) $(OBJECTS)
 
 tmplc: tmplc.o str.o
 	$(CC) $(CFLAGS) tmplc.o str.o -o tmplc
@@ -33,8 +34,7 @@ tmplfuncs.gen: $(TEMPLATES) tmplc views/head views/foot
 
 .PHONY: clean
 clean:
-	rm -f $(OBJECTS)
-	rm -f tmplc.o
+	rm -f *.o
 	rm -f tmplc
 	rm -f $(SERVEREXE)
 	rm -f *.gen
