@@ -1,5 +1,6 @@
 #include <curl/curl.h>
 #include <assert.h>
+#include <time.h>
 #include <err.h>
 #include <ldap.h>
 #include <unistd.h>
@@ -521,6 +522,51 @@ out:
 	sqlite3_finalize(invq);
 }
 
+static void events_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req;
+	sqlite3_stmt *s = NULL;
+	int e;
+	sql_prepare(
+		db,
+		STR("SELECT joiner.caseid, joiner.fullname, joiner.join_time, inviter.fullname\n"
+		"FROM user AS joiner\n"
+		"JOIN user AS inviter ON inviter.rowid = joiner.inviter\n"
+		"ORDER BY joiner.rowid ASC;"),
+		&s
+	);
+	int64_t n = 1;
+
+	while ((e = sqlite3_step(s)) == SQLITE_ROW) {
+		str_t joinercaseid = sql_column_str(s, 0);
+		str_t joinername = sql_column_str(s, 1);
+		int64_t unixjointime = sqlite3_column_int64(s, 2);
+		str_t invitername = sql_column_str(s, 3);
+		struct tm *jointime = localtime(&unixjointime);
+
+		char datebuf[1024];
+		strftime(datebuf, sizeof(datebuf), "%m/%d/%y %l:%M %p", jointime);
+
+		char buf[1024];
+		str_t s = { .ptr = buf };
+		s.len = snprintf(
+			buf,
+			sizeof(buf),
+			"%"PRId64": %s - %.*s invited %.*s (%.*s)\n"
+			,n
+			,datebuf
+			,PRSTR(invitername)
+			,PRSTR(joinername)
+			,PRSTR(joinercaseid)
+		);
+		cweb_append(res, s);
+	}
+	if (e != SQLITE_DONE)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	cweb_add_header(res, STR("Content-Type"), STR("text/plain"));
+	sqlite3_finalize(s);
+}
+
 void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 	sqlite3_stmt *s = NULL;
 	str_t caseid = *cweb_get_segment(req, STR("caseid"));
@@ -579,6 +625,7 @@ int main(void) {
 		{ "/tree", tree_handler, FILTERS(require_account) },
 		{ "/treedata.js", treedata_handler, FILTERS(require_account) },
 		{ "/profile/{caseid}", profile_handler, FILTERS(require_account) },
+		{ "/events", events_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){
