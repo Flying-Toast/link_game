@@ -13,7 +13,7 @@ run: $(SERVEREXE)
 
 .PHONY: install
 install: release
-	mv linkserver ../prod_links/
+	mv -f linkserver ../prod_links/
 	cp -r static ../prod_links/
 
 .PHONY: release
