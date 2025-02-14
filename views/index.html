@@ -5,7 +5,7 @@
 <div class="outset">
 	<h1>Link Game</h1>
 	<hr>
-	<p>Hi <%s myname>! Your invite code is <a href="/join/<%s refcode>">links.case.edu/join/<%s refcode></a>.</p>
+	<p>Hi <%str myname>! Your invite code is <a href="/join/<%str refcode>">links.case.edu/join/<%str refcode></a>.</p>
 	<p>Spread your link to get points:</p>
 	<ul>
 		<li>A CWRU student who joins using your link gets you 1 point.</li>
@@ -18,23 +18,23 @@
 	<h1>Stats</h1>
 	<hr>
 	<p><a href="/tree">View Tree</a></p>
-	<p>There are <%ld g_total> total participants:</p>
+	<p>There are <%i64 g_total> total participants:</p>
 	<ul>
-		<li><%ld g_nstud> students</li>
-		<li><%ld g_nfac> faculty</li>
-		<li><%ld g_nkaler> Eric Kalers</li>
+		<li><%i64 g_nstud> students</li>
+		<li><%i64 g_nfac> faculty</li>
+		<li><%i64 g_nkaler> Eric Kalers</li>
 	</ul>
-	<p><i>You</i> invited <%ld my_total> of them:</p>
+	<p><i>You</i> invited <%i64 my_total> of them:</p>
 	<ul>
-		<li><%ld my_nstud> students</li>
-		<li><%ld my_nfac> faculty</li>
-		<li><%ld my_nkaler> Eric Kalers</li>
+		<li><%i64 my_nstud> students</li>
+		<li><%i64 my_nfac> faculty</li>
+		<li><%i64 my_nkaler> Eric Kalers</li>
 	</ul>
 	<p>
 		Most recent event:<br>
-		<a href="/profile/<%s recentinvitercaseid>"><%s recentinvitername></a>
+		<a href="/profile/<%str recentinvitercaseid>"><%str recentinvitername></a>
 		invited
-		<a href="/profile/<%s recentjoinercaseid>"><%s recentjoinername></a>.
+		<a href="/profile/<%str recentjoinercaseid>"><%str recentjoinername></a>.
 	</p>
 	<p><a href="/events">Full log</a></p>
 </div>

@@ -2,15 +2,15 @@
 
 <div class="inset main-wrapper">
 <div class="outset">
-	<h1><%s myname></h1>
+	<h1><%str myname></h1>
 	<hr>
-	<p><a href="mailto:<%s caseid>@case.edu"><%s caseid>@case.edu</a></p>
-	<p>Invited by <a href="/profile/<%s inviter_caseid>"><%s inviter_fullname></a>.</p>
-	<p><%s myname> has invited <%ld totinvites> people:</p>
+	<p><a href="mailto:<%str caseid>@case.edu"><%str caseid>@case.edu</a></p>
+	<p>Invited by <a href="/profile/<%str inviter_caseid>"><%str inviter_fullname></a>.</p>
+	<p><%str myname> has invited <%i64 totinvites> people:</p>
 	<ul>
-		<li><%ld nstud> students</li>
-		<li><%ld nfac> faculty</li>
-		<li><%ld nkaler> Eric Kalers</li>
+		<li><%i64 nstud> students</li>
+		<li><%i64 nfac> faculty</li>
+		<li><%i64 nkaler> Eric Kalers</li>
 	</ul>
 	<p><a href="javascript:history.back()">Back</a></p>
 </div>

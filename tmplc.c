@@ -1,4 +1,5 @@
 #include <string.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <assert.h>
 #include <fcntl.h>
@@ -11,19 +12,20 @@
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-const struct {
-	const char *fmt;
+static const struct spec {
+	const char *placeholder_fmt;
+	const char *printf_fmt;
 	const char *type;
-} specspecs[] = {
-	{ "d", "int " },
-	{ "s", "str_t " },
-	{ "ld", "int64_t " },
+} specs[] = {
+	// NULL because str is special-cased to escape HTML
+	{ "str", NULL, "str_t " },
+	{ "i64", PRId64, "int64_t " },
 };
 
-static const char *spectype(str_t fmt) {
-	for (size_t i = 0; i < ARRAY_LEN(specspecs); i++) {
-		if (strncmp(specspecs[i].fmt, fmt.ptr, fmt.len) == 0)
-			return specspecs[i].type;
+static const struct spec *getspec(str_t fmt) {
+	for (size_t i = 0; i < ARRAY_LEN(specs); i++) {
+		if (strncmp(specs[i].placeholder_fmt, fmt.ptr, fmt.len) == 0)
+			return &specs[i];
 	}
 	return NULL;
 }
@@ -117,23 +119,24 @@ static void print_strlit(const char *ptr, size_t len) {
 	putchar('"');
 }
 
-static void append_arg(str_t spec, str_t name) {
-	if (strncmp("s", spec.ptr, spec.len) == 0) {
+static void append_arg(str_t specname, str_t name) {
+	const struct spec *spec = getspec(specname);
+	if (!spec)
+		errx(1, "No spec for %%%.*s", PRSTR(specname));
+
+	if (strncmp("str", specname.ptr, specname.len) == 0) {
 		printf(
 			"\tcweb_append_html_escaped(res, args->%.*s);\n"
-			,(int)name.len
-			,name.ptr
+			,PRSTR(name)
 		);
 	} else {
 		printf("\t{\n");
 		printf("\t\tchar buf[1024];\n");
 		printf("\t\tstr_t str = { .ptr = buf };\n");
 		printf(
-			"\t\tstr.len = snprintf(buf, sizeof(buf), \"%%%.*s\", args->%.*s);\n"
-			,(int)spec.len
-			,spec.ptr
-			,(int)name.len
-			,name.ptr
+			"\t\tstr.len = snprintf(buf, sizeof(buf), \"%%%s\", args->%.*s);\n"
+			,spec->printf_fmt
+			,PRSTR(name)
 		);
 		printf("\t\tassert(str.len < sizeof(buf));\n");
 		printf("\t\tcweb_append(res, str);\n");
@@ -184,10 +187,11 @@ static void do_args(const char *basename, char *buf) {
 		seen_args = realloc(seen_args, sizeof(*seen_args) * (nargs + 1));
 		seen_args[nargs] = name;
 
-		const char *type = spectype(spec);
-		if (!type)
-			errx(1, "no specspec for %%%.*s", (int)spec.len, spec.ptr);
-		printf("\t%s%.*s;\n", type, (int)name.len, name.ptr);
+		const struct spec *specspec = getspec(spec);
+		if (!specspec)
+			errx(1, "no specspec for %%%.*s", PRSTR(spec));
+		const char *type = getspec(spec)->type;
+		printf("\t%s%.*s;\n", type, PRSTR(name));
 		nargs++;
 	}
 	if (nargs == 0)
