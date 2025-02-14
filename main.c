@@ -25,6 +25,7 @@
 #endif
 
 static const char *d_arg;
+static const char *e_arg;
 static const char *s_arg;
 static bool z_flag;
 
@@ -611,10 +612,13 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 
 static void opts(int argc, char **argv) {
 	int ch;
-	while ((ch = getopt(argc, argv, "d:s:z")) != -1) {
+	while ((ch = getopt(argc, argv, "d:e:s:z")) != -1) {
 		switch (ch) {
 		case 'd':
 			d_arg = optarg;
+			break;
+		case 'e':
+			e_arg = optarg;
 			break;
 		case 's':
 			s_arg = optarg;
@@ -641,6 +645,14 @@ int main(int argc, char **argv) {
 
 	if (z_flag && daemon(1, 1))
 		err(1, "daemon");
+
+	if (e_arg) {
+		int efd = open(e_arg, O_WRONLY | O_CREAT, 0644);
+		if (efd == -1)
+			err(1, "open(e_arg)");
+		if (dup2(efd, 2) == -1)
+			err(1, "dup2(efd)");
+	}
 
 	int static_dir = open(s_arg, O_DIRECTORY);
 	if (static_dir == -1)

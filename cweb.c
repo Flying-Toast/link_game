@@ -650,7 +650,7 @@ void cweb_static_handler(struct request *req, struct response *res, sqlite3 *db)
 		err(1, "fstatat(%s)", fnamez);
 	int fd = openat(cweb_static_dir, fnamez, O_RDONLY);
 	if (fd == -1)
-		err(1, "open");
+		err(1, "open(cweb_static_dir)");
 	assert(res->body.len == 0);
 	string_grow(&res->body, sb.st_size);
 	if (readall(fd, res->body.ptr, sb.st_size) == -1)
