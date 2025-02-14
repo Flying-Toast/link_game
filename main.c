@@ -640,8 +640,14 @@ int main(int argc, char **argv) {
 		err(1, "open(static_path)");
 
 #ifdef __OpenBSD__
-	if (unveil(s_arg, "r") == -1 || unveil(d_arg, "rwc") == -1 || unveil(NULL, NULL) == -1)
+	if (unveil(s_arg, "r") == -1
+		|| unveil(d_arg, "rwc") == -1
+		|| unveil("/etc/resolv.conf", "r") == -1
+		|| unveil("/etc/ssl", "r") == -1
+		|| unveil(NULL, NULL) == -1
+	) {
 		err(1, "unveil");
+	}
 	if (pledge("wpath rpath cpath stdio proc id inet dns", "") == -1)
 		err(1, "pledge");
 #endif
