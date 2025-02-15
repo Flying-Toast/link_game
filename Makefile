@@ -15,6 +15,7 @@ run: $(SERVEREXE)
 install: release
 	mv -f linkserver ../prod_links/
 	cp -r static ../prod_links/
+	rcctl restart linkserver
 
 .PHONY: release
 release:
