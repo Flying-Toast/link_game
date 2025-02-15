@@ -264,8 +264,6 @@ static bool parse_cookie(struct request *req, str_t str) {
 /*
  * Returns true on success, false on failure.
  * The resulting request's lifetime is tied to that of `buf`.
- * `buf`'s ownership is passed to this function; NUL bytes are inserted in
- * certain places to terminate strings.
  */
 static bool parse_request(struct request *req, char *buf, size_t bufsiz) {
 	if (bufsiz == 0)
