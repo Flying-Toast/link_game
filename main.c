@@ -92,16 +92,16 @@ static bool store_user_ldap_info(str_t caseid, sqlite3 *db) {
 		STR("UPDATE user SET fullname = ?, ldap_title = ?, firstname = ? WHERE caseid = ?;"),
 		&s
 	);
-	sql_bind_text(s, 1, fullname);
+	sql_bind_str(s, 1, fullname);
 	if (title_values && title_values[0] != NULL) {
 		str_t tv = {
 			.ptr = title_values[0]->bv_val,
 			.len = title_values[0]->bv_len,
 		};
-		sql_bind_text(s, 2, tv);
+		sql_bind_str(s, 2, tv);
 	}
-	sql_bind_text(s, 3, firstname);
-	sql_bind_text(s, 4, caseid);
+	sql_bind_str(s, 3, firstname);
+	sql_bind_str(s, 4, caseid);
 	if (sqlite3_step(s) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
@@ -221,13 +221,13 @@ static int64_t gen_session(sqlite3 *db, char *caseid) {
 	sqlite3_stmt *ins = NULL;
 
 	sql_prepare(db, STR("DELETE FROM session WHERE caseid = ?;"), &del);
-	sql_bind_text(del, 1, ztostr(caseid));
+	sql_bind_str(del, 1, ztostr(caseid));
 	if (sqlite3_step(del) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
 	sql_prepare(db, STR("INSERT INTO session (secret, caseid) VALUES (?, ?);"), &ins);
 	sql_bind_int64(ins, 1, sid);
-	sql_bind_text(ins, 2, ztostr(caseid));
+	sql_bind_str(ins, 2, ztostr(caseid));
 	if (sqlite3_step(ins) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 
@@ -482,7 +482,7 @@ static void create_user(
 		&ins
 	);
 	sql_bind_int64(ins, 1, inviter_uid);
-	sql_bind_text(ins, 2, refcodestr);
+	sql_bind_str(ins, 2, refcodestr);
 	sql_bind_int64(ins, 3, current_sid);
 	if (sqlite3_step(ins) != SQLITE_DONE)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -510,20 +510,13 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 	str_t inviter_name = {0};
 	int64_t inviter_uid;
 
-	// check if user already exists
-	int64_t sid = getsessid(req);
-	if (sid != -1 && uid_from_sid(db, sid) != 0) {
-		render_html(res, already_joined, 0);
-		goto out;
-	}
-
 	str_t refcode = *cweb_get_segment(req, STR("refcode"));
 	sql_prepare(
 		db,
 		STR("SELECT rowid, fullname FROM user WHERE refcode = ?;"),
 		&invq
 	);
-	sql_bind_text(invq, 1, refcode);
+	sql_bind_str(invq, 1, refcode);
 	e = sqlite3_step(invq);
 	if (e == SQLITE_ROW) {
 		inviter_uid = sqlite3_column_int64(invq, 0);
@@ -532,6 +525,18 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 		if (e != SQLITE_DONE)
 			errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 		cweb_append(res, STR("Invalid invite link"));
+		goto out;
+	}
+
+	// check if user already exists
+	int64_t sid = getsessid(req);
+	int64_t session_uid = uid_from_sid(db, sid);
+	if (sid != -1 && session_uid != 0) {
+		if (session_uid == inviter_uid) {
+			render_html(res, qrcode, .refcode = refcode, .fullname = inviter_name);
+		} else {
+			render_html(res, already_joined, 0);
+		}
 		goto out;
 	}
 
@@ -609,7 +614,7 @@ static int64_t uidfromcaseid(sqlite3 *db, str_t caseid) {
 	sqlite3_stmt *s = NULL;
 
 	sql_prepare(db, STR("SELECT rowid FROM user WHERE caseid = ?;"), &s);
-	sql_bind_text(s, 1, caseid);
+	sql_bind_str(s, 1, caseid);
 
 	if (sqlite3_step(s) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
@@ -640,7 +645,7 @@ void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 		"WHERE me.caseid = ?;"),
 		&s
 	);
-	sql_bind_text(s, 1, caseid);
+	sql_bind_str(s, 1, caseid);
 	if (sqlite3_step(s) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	int64_t uid = sqlite3_column_int64(s, 0);
@@ -730,6 +735,7 @@ int main(int argc, char **argv) {
 		{ "/join/{refcode}", invite_handler },
 		{ "/style.css", cweb_static_handler },
 		{ "/d3.js", cweb_static_handler },
+		{ "/qr.js", cweb_static_handler },
 
 		{ "/", index_handler, FILTERS(require_account) },
 		{ "/welcome", welcome_handler, FILTERS(require_account) },

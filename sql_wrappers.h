@@ -12,7 +12,7 @@ static inline void sql_prepare(
 ) {
 	int err = sqlite3_prepare_v2(db, zSql.ptr, (int)zSql.len, ppStmt, NULL);
 	if (err != SQLITE_OK)
-		errx(1, "Error in query \"%.*s\": %s", (int)zSql.len, zSql.ptr, sqlite3_errmsg(db));
+		errx(1, "Error in query \"%.*s\": %s", PRSTR(zSql), sqlite3_errmsg(db));
 }
 
 static inline void sql_bind_int64(sqlite3_stmt *s, int idx, sqlite3_int64 x) {
@@ -21,7 +21,7 @@ static inline void sql_bind_int64(sqlite3_stmt *s, int idx, sqlite3_int64 x) {
 		errx(1, "sql_bind_int64(idx = %d, x = %lld): %s", idx, x, sqlite3_errstr(err));
 }
 
-static inline void sql_bind_text(
+static inline void sql_bind_str(
 	sqlite3_stmt *s,
 	int idx,
 	str_t text

@@ -1,0 +1,26 @@
+<%include views/head>
+
+<script src="/qr.js"></script>
+
+<div class="inset main-wrapper">
+	<div class="outset">
+		<h1><%s fullname></h1>
+		<hr>
+		<p>Your invite link, as a QR code:</p>
+		<p><a href="/">Home</a></p>
+	</div>
+	<div id="qr-wrapper" class="outset" style="text-align:center;"></div>
+</div>
+
+<script>
+	let el = document.getElementById("qr-wrapper");
+	let node = QRCode({
+		msg: "http://links.case.edu/join/<%str refcode>",
+		pal: ["#000", "#fff"],
+	});
+	node.setAttribute("width", "100%");
+	node.setAttribute("height", "100%");
+	el.appendChild(node);
+</script>
+
+<%include views/foot>
