@@ -548,8 +548,13 @@ static void invite_handler(struct request *req, struct response *res, sqlite3 *d
 			.inviter_name = inviter_name,
 		);
 	} else {
-		create_user(db, inviter_uid, sid);
-		redirect(res, STR("/welcome"));
+		if (sid_valid(db, sid)) {
+			create_user(db, inviter_uid, sid);
+			redirect(res, STR("/welcome"));
+		} else {
+			cweb_delete_cookie(res, STR("s"));
+			redirect(res, STR("/"));
+		}
 	}
 
 out:
