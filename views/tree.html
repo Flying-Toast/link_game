@@ -19,7 +19,7 @@
 
 	function chart() {
 		const zoom = d3.zoom()
-			.scaleExtent([1, 40])
+			.scaleExtent([0.1, 40])
 			.on("zoom", zoomed);
 
 		const root = d3.hierarchy(inviteData);
@@ -67,7 +67,7 @@
 
 			const transition = svg.transition()
 				.duration(duration)
-				.attr("viewBox", [-margin.left, left.x - margin.top, width, height])
+				.attr("viewBox", [-width / 2, -dx / 2, width, dx])
 				.tween("resize", window.ResizeObserver ? null : () => () => svg.dispatch("toggle"));
 
 			const node = gNode.selectAll("g").data(nodes, d => d.id);
