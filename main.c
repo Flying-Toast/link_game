@@ -551,8 +551,8 @@ out:
 	sqlite3_finalize(invq);
 }
 
-static void events_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)req;
+// if uid==-1, shows all events. otherwise, just people invited by `uid`.
+static void render_events(struct response *res, sqlite3 *db, int64_t uid) {
 	sqlite3_stmt *s = NULL;
 	int e;
 	sql_prepare(
@@ -560,9 +560,13 @@ static void events_handler(struct request *req, struct response *res, sqlite3 *d
 		STR("SELECT joiner.caseid, joiner.fullname, joiner.join_time, inviter.fullname\n"
 		"FROM user AS joiner\n"
 		"JOIN user AS inviter ON inviter.rowid = joiner.inviter\n"
+		"WHERE inviter.rowid = ? OR ?\n"
 		"ORDER BY joiner.rowid ASC;"),
 		&s
 	);
+	sqlite3_bind_int64(s, 1, uid);
+	sqlite3_bind_int64(s, 2, uid == -1);
+
 	int64_t n = 1;
 
 	while ((e = sqlite3_step(s)) == SQLITE_ROW) {
@@ -594,6 +598,35 @@ static void events_handler(struct request *req, struct response *res, sqlite3 *d
 
 	cweb_add_header(res, STR("Content-Type"), STR("text/plain"));
 	sqlite3_finalize(s);
+}
+
+static void global_events_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req;
+	render_events(res, db, -1);
+}
+
+static int64_t uidfromcaseid(sqlite3 *db, str_t caseid) {
+	sqlite3_stmt *s = NULL;
+
+	sql_prepare(db, STR("SELECT rowid FROM user WHERE caseid = ?;"), &s);
+	sql_bind_text(s, 1, caseid);
+
+	if (sqlite3_step(s) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	int64_t uid = sqlite3_column_int64(s, 0);
+
+	sqlite3_finalize(s);
+	return uid;
+}
+
+static void profile_events_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req;
+
+	str_t caseid = *cweb_get_segment(req, STR("caseid"));
+	int64_t uid = uidfromcaseid(db, caseid);
+
+	render_events(res, db, uid);
 }
 
 void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -703,7 +736,8 @@ int main(int argc, char **argv) {
 		{ "/tree", tree_handler, FILTERS(require_account) },
 		{ "/treedata.js", treedata_handler, FILTERS(require_account) },
 		{ "/profile/{caseid}", profile_handler, FILTERS(require_account) },
-		{ "/events", events_handler, FILTERS(require_account) },
+		{ "/profile/{caseid}/events", profile_events_handler, FILTERS(require_account) },
+		{ "/events", global_events_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){
