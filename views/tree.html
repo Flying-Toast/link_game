@@ -13,120 +13,112 @@
 	let dx = 10;
 	let dy = 200;
 	let width = 600;
-	let margin = {top: 10, right: 120, bottom: 10, left: 40};
 	let tree = d3.tree().nodeSize([dx, dy]);
 	let diagonal = d3.linkHorizontal().x(d => d.y).y(d => d.x);
 
-	function chart() {
-		const zoom = d3.zoom()
-			.scaleExtent([0.1, 40])
-			.on("zoom", zoomed);
+	const zoom = d3.zoom()
+		.scaleExtent([0.1, 40])
+		.on("zoom", zoomed);
 
-		const root = d3.hierarchy(inviteData);
+	const root = d3.hierarchy(inviteData);
 
-		root.x0 = dy / 2;
-		root.y0 = 0;
-		root.descendants().forEach((d, i) => {
-			d.id = i;
-			d._children = d.children;
-		});
+	root.x0 = dy / 2;
+	root.y0 = 0;
+	root.descendants().forEach((d, i) => {
+		d.id = i;
+		d._children = d.children;
+	});
 
-		const svg = d3.create("svg")
-			.attr("viewBox", [-width / 2, -dx / 2, width, dx])
-			.style("font", "10px sans-serif")
-			.style("user-select", "none");
+	const svg = d3.create("svg")
+		.attr("viewBox", [-width / 2, -dx / 2, width, dx])
+		.style("font", "10px sans-serif")
+		.style("user-select", "none");
 
-		const gLink = svg.append("g")
-			.attr("fill", "none")
-			.attr("stroke", "#555")
-			.attr("stroke-opacity", 0.4)
-			.attr("stroke-width", 1.5);
+	const gLink = svg.append("g")
+		.attr("fill", "none")
+		.attr("stroke", "#555")
+		.attr("stroke-opacity", 0.4)
+		.attr("stroke-width", 1.5);
 
-		const gNode = svg.append("g");
-		svg.call(zoom);
-		function zoomed() {
-			gNode.attr("transform", d3.event.transform);
-			gLink.attr("transform", d3.event.transform);
-		}
-
-		function update(source) {
-			const nodes = root.descendants().reverse();
-			const links = root.links();
-
-			tree(root);
-
-			let left = root;
-			let right = root;
-			root.eachBefore(node => {
-				if (node.x < left.x) left = node;
-				if (node.x > right.x) right = node;
-			});
-
-			const height = 100;
-
-			const node = gNode.selectAll("g").data(nodes, d => d.id);
-
-			const nodeEnter = node.enter().append("g")
-				.attr("transform", d => `translate(${source.y0},${source.x0})`)
-				.attr("fill-opacity", 0)
-				.attr("stroke-opacity", 0);
-
-			nodeEnter.append("circle")
-				.attr("r", 2.5)
-				.attr("fill", d => d._children ? "#555" : "#999")
-				.attr("stroke-width", 10);
-
-			nodeEnter.append("a")
-				.attr("href", d => `/profile/${d.data.c}`)
-				.append("text")
-				.attr("fill", "blue")
-				.attr("text-decoration", "underline")
-				.attr("dy", "0.31em")
-				.attr("x", d => d._children ? -6 : 6)
-				.attr("text-anchor", d => d._children ? "end" : "start")
-				.text(d => d.data.n)
-				.clone(true).lower();
-
-			const nodeUpdate = node.merge(nodeEnter)
-				.attr("transform", d => `translate(${d.y},${d.x})`)
-				.attr("fill-opacity", 1)
-				.attr("stroke-opacity", 1);
-
-			const nodeExit = node.exit().remove()
-				.attr("transform", d => `translate(${d.y},${d.x})`)
-				.attr("fill-opacity", 0)
-				.attr("stroke-opacity", 0);
-
-			const link = gLink.selectAll("path").data(links, d => d.target.id);
-
-			const linkEnter = link.enter().append("path")
-				.attr("d", d => {
-					const o = {x: d.x0, y: d.y0};
-					return diagonal({source: o, target: o});
-				});
-
-			link.merge(linkEnter).attr("d", diagonal);
-
-			link.exit().remove()
-				.attr("d", d => {
-					const o = {x: source.x, y: source.y};
-					return diagonal({source: o, target: o});
-				});
-
-			root.eachBefore(d => {
-				d.x0 = d.x;
-				d.y0 = d.y;
-			});
-		}
-
-		update(root);
-
-		let ret = svg.node();
-		ret.style.width = "100%";
-		ret.style.height = "100%";
-		return ret;
+	const gNode = svg.append("g");
+	svg.call(zoom);
+	function zoomed() {
+		gNode.attr("transform", d3.event.transform);
+		gLink.attr("transform", d3.event.transform);
 	}
 
-	document.getElementById("container").append(chart());
+	const nodes = root.descendants().reverse();
+	const links = root.links();
+
+	tree(root);
+
+	let left = root;
+	let right = root;
+	root.eachBefore(node => {
+		if (node.x < left.x) left = node;
+		if (node.x > right.x) right = node;
+	});
+
+	const height = 100;
+
+	const node = gNode.selectAll("g").data(nodes, d => d.id);
+
+	const nodeEnter = node.enter().append("g")
+		.attr("transform", d => `translate(${root.y0},${root.x0})`)
+		.attr("fill-opacity", 0)
+		.attr("stroke-opacity", 0);
+
+	nodeEnter.append("circle")
+		.attr("r", 2.5)
+		.attr("fill", d => d._children ? "#555" : "#999")
+		.attr("stroke-width", 10);
+
+	nodeEnter.append("a")
+		.attr("href", d => `/profile/${d.data.c}`)
+		.append("text")
+		.attr("fill", "blue")
+		.attr("text-decoration", "underline")
+		.attr("dy", "0.31em")
+		.attr("x", d => d._children ? -6 : 6)
+		.attr("text-anchor", d => d._children ? "end" : "start")
+		.text(d => d.data.n)
+		.clone(true).lower();
+
+	const nodeUpdate = node.merge(nodeEnter)
+		.attr("transform", d => `translate(${d.y},${d.x})`)
+		.attr("fill-opacity", 1)
+		.attr("stroke-opacity", 1);
+
+	const nodeExit = node.exit().remove()
+		.attr("transform", d => `translate(${d.y},${d.x})`)
+		.attr("fill-opacity", 0)
+		.attr("stroke-opacity", 0);
+
+	const link = gLink.selectAll("path").data(links, d => d.target.id);
+
+	const linkEnter = link.enter().append("path")
+		.attr("d", d => {
+			const o = {x: d.x0, y: d.y0};
+			return diagonal({source: o, target: o});
+		});
+
+	link.merge(linkEnter).attr("d", diagonal);
+
+	link.exit().remove()
+		.attr("d", d => {
+			const o = {x: source.x, y: source.y};
+			return diagonal({source: o, target: o});
+		});
+
+	root.eachBefore(d => {
+		d.x0 = d.x;
+		d.y0 = d.y;
+	});
+
+	let svgNode = svg.node();
+	svgNode.style.width = "100%";
+	svgNode.style.height = "100%";
+
+	document.getElementById("container").append(svgNode);
 </script>
 <%include views/foot>
