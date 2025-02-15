@@ -567,8 +567,7 @@ static void render_events(struct response *res, sqlite3 *db, int64_t uid) {
 	int e;
 	sql_prepare(
 		db,
-		STR("SELECT joiner.caseid, joiner.fullname, joiner.join_time, inviter.fullname,\n"
-		"inviter.rowid = joiner.rowid\n"
+		STR("SELECT joiner.caseid, joiner.fullname, joiner.join_time, inviter.fullname\n"
 		"FROM user AS joiner\n"
 		"JOIN user AS inviter ON inviter.rowid = joiner.inviter\n"
 		"WHERE inviter.rowid = ? OR ?\n"
@@ -585,11 +584,7 @@ static void render_events(struct response *res, sqlite3 *db, int64_t uid) {
 		str_t joinername = sql_column_str(s, 1);
 		int64_t unixjointime = sqlite3_column_int64(s, 2);
 		str_t invitername = sql_column_str(s, 3);
-		bool is_root = sqlite3_column_int64(s, 4);
 		struct tm *jointime = localtime(&unixjointime);
-
-		if (is_root)
-			continue;
 
 		char datebuf[1024];
 		strftime(datebuf, sizeof(datebuf), "%m/%d/%y %l:%M %p", jointime);
