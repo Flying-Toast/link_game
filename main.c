@@ -172,7 +172,7 @@ static void refcounts(
 			"SUM(CASE WHEN ldap_title IS NULL THEN 1 ELSE 0 END),\n"
 			"SUM(CASE WHEN ldap_title IS NOT NULL AND caseid <> 'ewk42' THEN 1 ELSE 0 END),\n"
 			"SUM(CASE WHEN caseid = 'ewk42' THEN 1 ELSE 0 END)\n"
-			"FROM user WHERE inviter = ? OR ?;"),
+			"FROM user WHERE (inviter = ? OR ?) AND inviter <> rowid;"),
 		&s
 	);
 	sql_bind_int64(s, 1, uid);
@@ -570,7 +570,7 @@ static void render_events(struct response *res, sqlite3 *db, int64_t uid) {
 		STR("SELECT joiner.caseid, joiner.fullname, joiner.join_time, inviter.fullname\n"
 		"FROM user AS joiner\n"
 		"JOIN user AS inviter ON inviter.rowid = joiner.inviter\n"
-		"WHERE inviter.rowid = ? OR ?\n"
+		"WHERE (inviter.rowid = ? OR ?) AND inviter.rowid <> joiner.rowid\n"
 		"ORDER BY joiner.rowid ASC;"),
 		&s
 	);
