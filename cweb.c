@@ -146,9 +146,6 @@ static bool segmentize(str_t path, struct request *req) {
 	path.ptr++;
 
 	while (path.len) {
-		req->n_segments += 1;
-		req->segments = realloc(req->segments, sizeof(req->segments[0]) * req->n_segments);
-
 		size_t seglen = 0;
 		const char *start = path.ptr;
 		while (path.len && *path.ptr != '/') {
@@ -156,7 +153,12 @@ static bool segmentize(str_t path, struct request *req) {
 			path.ptr++;
 			path.len--;
 		}
+		// forbid empty segments
+		if (seglen == 0)
+			return false;
 
+		req->n_segments += 1;
+		req->segments = realloc(req->segments, sizeof(req->segments[0]) * req->n_segments);
 		req->segments[req->n_segments - 1].ptr = start;
 		req->segments[req->n_segments - 1].len = seglen;
 
