@@ -521,6 +521,7 @@ void cweb_run(struct cweb_args *args) {
 				errx(1, "sqlite3_open: %s", sqlite3_errmsg(db));
 			sqlite3_busy_timeout(db, 3000);
 
+			alarm(5);
 			handle(connfd, routes, args->n_route_specs, db);
 
 			if (db && sqlite3_close(db) != SQLITE_OK)
