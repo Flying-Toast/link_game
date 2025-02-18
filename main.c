@@ -649,7 +649,29 @@ static void profile_events_handler(struct request *req, struct response *res, sq
 	render_events(res, db, uid);
 }
 
-void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
+static void list_faculty_handler(struct request *req, struct response *res, sqlite3 *db) {
+	(void)req;
+	sqlite3_stmt *q = NULL;
+
+	sql_prepare(db, STR("SELECT fullname, ldap_title FROM user WHERE ldap_title IS NOT NULL;"), &q);
+
+	int e;
+	while ((e = sqlite3_step(q)) == SQLITE_ROW) {
+		str_t fullname = sql_column_str(q, 0);
+		str_t ldap_title = sql_column_str(q, 1);
+
+		char buf[1024];
+		int len = snprintf(buf, sizeof(buf), "%.*s (%.*s)\n", PRSTR(fullname), PRSTR(ldap_title));
+		str_t line = { .ptr = buf, .len = len };
+		cweb_append(res, line);
+	}
+	if (e != SQLITE_DONE)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+
+	sqlite3_finalize(q);
+}
+
+static void profile_handler(struct request *req, struct response *res, sqlite3 *db) {
 	sqlite3_stmt *s = NULL;
 	str_t caseid = *cweb_get_segment(req, STR("caseid"));
 
@@ -759,6 +781,7 @@ int main(int argc, char **argv) {
 		{ "/profile/{caseid}", profile_handler, FILTERS(require_account) },
 		{ "/profile/{caseid}/events", profile_events_handler, FILTERS(require_account) },
 		{ "/events", global_events_handler, FILTERS(require_account) },
+		{ "/list-faculty", list_faculty_handler, FILTERS(require_account) },
 	};
 
 	cweb_run(&(struct cweb_args){
