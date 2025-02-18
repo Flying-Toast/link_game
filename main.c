@@ -617,17 +617,23 @@ static void global_events_handler(struct request *req, struct response *res, sql
 
 static int64_t uidfromcaseid(sqlite3 *db, str_t caseid) {
 	sqlite3_stmt *s = NULL;
+	int64_t ret = -1;
 
 	sql_prepare(db, STR("SELECT rowid FROM user WHERE caseid = ?;"), &s);
 	sql_bind_str(s, 1, caseid);
 
-	if (sqlite3_step(s) != SQLITE_ROW)
+	int e = sqlite3_step(s);
+	if (e == SQLITE_DONE) {
+		ret = -1;
+		goto out;
+	} else if (e != SQLITE_ROW) {
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	}
 
-	int64_t uid = sqlite3_column_int64(s, 0);
-
+	ret = sqlite3_column_int64(s, 0);
+out:
 	sqlite3_finalize(s);
-	return uid;
+	return ret;
 }
 
 static void profile_events_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -635,6 +641,10 @@ static void profile_events_handler(struct request *req, struct response *res, sq
 
 	str_t caseid = *cweb_get_segment(req, STR("caseid"));
 	int64_t uid = uidfromcaseid(db, caseid);
+	if (uid == -1) {
+		not_found(res);
+		return;
+	}
 
 	render_events(res, db, uid);
 }
