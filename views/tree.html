@@ -5,7 +5,16 @@
 		<hr>
 		<p>Pinch/scroll to zoom, drag to pan. Click a name to see their profile. <a href="/">Home</a>.</p>
 	</div>
-	<div id="container" class="outset" style="height:100%;"></div>
+	<div id="container" class="outset" style="height:100%;">
+		<div style="position:absolute;background:#bdbdbd;">
+			<ul style="padding:2px;list-style-position:inside;margin:0;">
+				<li style="color:#ad6f1f;">first place</li>
+				<li style="color:blue;">students</li>
+				<li style="color:darkgreen;">faculty</li>
+				<li style="color:crimson;">Eric Kaler</li>
+			</ul>
+		</div>
+	</div>
 </div>
 <script src="/d3.js"></script>
 <script src="/treedata.js"></script>
@@ -75,8 +84,17 @@
 
 	nodeEnter.append("a")
 		.attr("href", d => `/profile/${d.data.c}`)
+		.attr("fill", function (d) {
+			if (d.data.c == "<%str leadercaseid>")
+				return "#ad6f1f";
+			else if (d.data.c == "ewk42")
+				return "crimson";
+			else if (d.data.f)
+				return "darkgreen";
+			else
+				return "blue";
+		})
 		.append("text")
-		.attr("fill", "blue")
 		.attr("text-decoration", "underline")
 		.attr("dy", "0.31em")
 		.attr("x", d => d._children ? -6 : 6)

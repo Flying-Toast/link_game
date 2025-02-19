@@ -121,15 +121,21 @@ static string_t render_tree_data(sqlite3 *db) {
 	sqlite3_stmt *s = NULL;
 	int e;
 	string_t ret = {0};
-	string_append(&ret, STR("let inviteData=null;let m=new Map();function a(uid,fullname,inviterUid,caseid){let o={n:fullname,children:[],c:caseid};m.set(uid,o);if(uid==inviterUid){inviteData=o;}else{m.get(inviterUid).children.push(o);}}"));
+	string_append(&ret, STR("let inviteData=null;let m=new Map();function a(uid,fullname,inviterUid,caseid,isFaculty){let o={n:fullname,children:[],c:caseid,f:!!isFaculty};m.set(uid,o);if(uid==inviterUid){inviteData=o;}else{m.get(inviterUid).children.push(o);}}"));
 
-	sql_prepare(db, STR("SELECT rowid, fullname, inviter, caseid FROM user ORDER BY rowid ASC;"), &s);
+	sql_prepare(
+		db,
+		STR("SELECT rowid, fullname, inviter, caseid, ldap_title IS NOT NULL\n"
+		"FROM user ORDER BY rowid ASC;"),
+		&s
+	);
 
 	while ((e = sqlite3_step(s)) == SQLITE_ROW) {
 		int64_t uid = sqlite3_column_int64(s, 0);
 		str_t fullname = sql_column_str(s, 1);
 		int64_t inviter = sqlite3_column_int64(s, 2);
 		str_t caseid = sql_column_str(s, 3);
+		bool isfaculty = sqlite3_column_int64(s, 4) == 1;
 
 		// TODO: escape double quotes and backslashes from fullname
 		assert(memchr(fullname.ptr, '"', fullname.len) == NULL);
@@ -140,11 +146,12 @@ static string_t render_tree_data(sqlite3 *db) {
 		item.len = snprintf(
 			buf,
 			sizeof(buf),
-			"a(%"PRId64",\"%.*s\",%"PRId64",\"%.*s\");"
+			"a(%"PRId64",\"%.*s\",%"PRId64",\"%.*s\"%s);"
 			,uid
 			,PRSTR(fullname)
 			,inviter
 			,PRSTR(caseid)
+			,isfaculty ? ",1" : ""
 		);
 		assert(item.len < sizeof(buf));
 		string_append(&ret, item);
@@ -301,9 +308,45 @@ static void logout_handler(struct request *req, struct response *res, sqlite3 *d
 	render_html(res, logout, 0);
 }
 
+static void getleader(sqlite3 *db, int64_t *uid_out, int64_t *points_out) {
+	sqlite3_stmt *leader_q = NULL;
+
+	sql_prepare(
+		db,
+		STR("SELECT leader.rowid, (\n"
+		"(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.ldap_title IS NULL)\n"
+		"+ 5*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.ldap_title IS NOT NULL AND invited.caseid <> 'ewk42')\n"
+		"+ 100*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.caseid = 'ewk42')\n"
+		") as points\n"
+		"FROM user leader ORDER BY points DESC\n"
+		"LIMIT 1"),
+		&leader_q
+	);
+	if (sqlite3_step(leader_q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	if (uid_out)
+		*uid_out = sqlite3_column_int64(leader_q, 0);
+	if (points_out)
+		*points_out = sqlite3_column_int64(leader_q, 1);
+
+	sqlite3_finalize(leader_q);
+}
+
 static void tree_handler(struct request *req, struct response *res, sqlite3 *db) {
-	(void)req; (void)db;
-	render_html(res, tree, 0);
+	(void)req;
+	sqlite3_stmt *q;
+	int64_t leaderuid;
+	getleader(db, &leaderuid, NULL);
+
+	sql_prepare(db, STR("SELECT caseid FROM user WHERE rowid = ?;"), &q);
+	sql_bind_int64(q, 1, leaderuid);
+	if (sqlite3_step(q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t leadercaseid = sql_column_str(q, 0);
+
+	render_html(res, tree, .leadercaseid = leadercaseid);
+
+	sqlite3_finalize(q);
 }
 
 static void treedata_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -344,22 +387,19 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	str_t invitercaseid = sql_column_str(recents_q, 2);
 	str_t invitername = sql_column_str(recents_q, 3);
 
+	int64_t leaderuid;
+	int64_t leaderpoints;
+	getleader(db, &leaderuid, &leaderpoints);
 	sql_prepare(
 		db,
-		STR("SELECT leader.caseid, leader.fullname, (\n"
-		"(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.ldap_title IS NULL)\n"
-		"+ 5*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.ldap_title IS NOT NULL AND invited.caseid <> 'ewk42')\n"
-		"+ 100*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.caseid = 'ewk42')\n"
-		") as points\n"
-		"FROM user leader ORDER BY points DESC\n"
-		"LIMIT 1"),
+		STR("SELECT caseid, fullname FROM user WHERE rowid = ?;"),
 		&leader_q
 	);
+	sql_bind_int64(leader_q, 1, leaderuid);
 	if (sqlite3_step(leader_q) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t leadercaseid = sql_column_str(leader_q, 0);
 	str_t leadername = sql_column_str(leader_q, 1);
-	int64_t leaderpoints = sqlite3_column_int64(leader_q, 2);
 
 	int64_t my_nstud, my_nfac, my_nkaler;
 	int64_t g_nstud, g_nfac, g_nkaler;
