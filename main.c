@@ -763,6 +763,7 @@ static void profile_handler(struct request *req, struct response *res, sqlite3 *
 		.nfac = nfac,
 		.nkaler = nkaler,
 		.totinvites = nstud + nfac + nkaler,
+		.points = nstud + 5*nfac + 100*nkaler,
 		.caseid = caseid,
 		.inviter_caseid = inviter_caseid,
 		.inviter_fullname = inviter_fullname,
