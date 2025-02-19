@@ -315,6 +315,7 @@ static void treedata_handler(struct request *req, struct response *res, sqlite3 
 static void index_handler(struct request *req, struct response *res, sqlite3 *db) {
 	sqlite3_stmt *q = NULL;
 	sqlite3_stmt *recents_q = NULL;
+	sqlite3_stmt *leader_q = NULL;
 
 	sql_prepare(
 		db,
@@ -343,6 +344,23 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	str_t invitercaseid = sql_column_str(recents_q, 2);
 	str_t invitername = sql_column_str(recents_q, 3);
 
+	sql_prepare(
+		db,
+		STR("SELECT leader.caseid, leader.fullname, (\n"
+		"(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.ldap_title IS NULL)\n"
+		"+ 5*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.ldap_title IS NOT NULL AND invited.caseid <> 'ewk42')\n"
+		"+ 100*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.caseid = 'ewk42')\n"
+		") as points\n"
+		"FROM user leader ORDER BY points DESC\n"
+		"LIMIT 1"),
+		&leader_q
+	);
+	if (sqlite3_step(leader_q) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t leadercaseid = sql_column_str(leader_q, 0);
+	str_t leadername = sql_column_str(leader_q, 1);
+	int64_t leaderpoints = sqlite3_column_int64(leader_q, 2);
+
 	int64_t my_nstud, my_nfac, my_nkaler;
 	int64_t g_nstud, g_nfac, g_nkaler;
 	refcounts(db, req->uid, &my_nstud, &my_nfac, &my_nkaler);
@@ -365,9 +383,13 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 		.recentinvitername = invitername,
 		.recentjoinercaseid = joinercaseid,
 		.recentjoinername = joinername,
+		.leadercaseid = leadercaseid,
+		.leadername = leadername,
+		.leaderpoints = leaderpoints,
 	);
 	sqlite3_finalize(q);
 	sqlite3_finalize(recents_q);
+	sqlite3_finalize(leader_q);
 }
 
 static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
