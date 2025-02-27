@@ -4,7 +4,7 @@ CFLAGS=-Wall -Wextra -Wpedantic -Wno-missing-field-initializers -Wno-overlength-
        `pkg-config --cflags $(LIBS)`
 SERVEREXE=linkserver
 TEMPLATES!=echo views/*.html
-OBJECTS=cweb.o main.o str.o
+OBJECTS=cweb.o main.o
 HEADERS=cweb.h sql_wrappers.h str.h
 
 .PHONY: run
@@ -31,8 +31,9 @@ main.o: tmplfuncs.gen
 $(SERVEREXE): $(OBJECTS)
 	$(CC) $(CFLAGS) `pkg-config --libs $(LIBS)` -o $(SERVEREXE) $(OBJECTS)
 
-tmplc: tmplc.o str.o
-	$(CC) $(CFLAGS) tmplc.o str.o -o tmplc
+tmplc.o: str.h
+tmplc: tmplc.o
+	$(CC) $(CFLAGS) tmplc.o -o tmplc
 
 tmplfuncs.gen: $(TEMPLATES) tmplc views/head views/foot
 	./tmplc $(TEMPLATES) >tmplfuncs.gen
