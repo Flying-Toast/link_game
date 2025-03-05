@@ -8,7 +8,8 @@
 	<div id="container" class="outset" style="height:100%;">
 		<div style="position:absolute;background:#bdbdbd;">
 			<ul style="padding:2px;list-style-position:inside;margin:0;">
-				<li style="color:#ad6f1f;">first place</li>
+				<li style="color:#ad6f1f;">1st place</li>
+				<li style="color:#771ca8;">2nd place</li>
 				<li style="color:blue;">students</li>
 				<li style="color:darkgreen;">faculty</li>
 				<li style="color:crimson;">Eric Kaler</li>
@@ -87,6 +88,8 @@
 		.attr("fill", function (d) {
 			if (d.data.c == "<%str leadercaseid>")
 				return "#ad6f1f";
+			else if (d.data.c == "<%str secondplacecaseid>")
+				return "#771ca8";
 			else if (d.data.c == "ewk42")
 				return "crimson";
 			else if (d.data.f)

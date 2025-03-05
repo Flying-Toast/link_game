@@ -308,7 +308,7 @@ static void logout_handler(struct request *req, struct response *res, sqlite3 *d
 	render_html(res, logout, 0);
 }
 
-static void getleader(sqlite3 *db, int64_t *uid_out, int64_t *points_out) {
+static void get_nth_leader(sqlite3 *db, int64_t n, int64_t *uid_out, int64_t *points_out) {
 	sqlite3_stmt *leader_q = NULL;
 
 	sql_prepare(
@@ -319,9 +319,11 @@ static void getleader(sqlite3 *db, int64_t *uid_out, int64_t *points_out) {
 		"+ 100*(SELECT COUNT(*) FROM user invited WHERE invited.inviter = leader.rowid AND invited.caseid = 'ewk42')\n"
 		") as points\n"
 		"FROM user leader ORDER BY points DESC\n"
-		"LIMIT 1"),
+		"LIMIT 1\n"
+		"OFFSET ?"),
 		&leader_q
 	);
+	sql_bind_int64(leader_q, 1, n);
 	if (sqlite3_step(leader_q) != SQLITE_ROW)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	if (uid_out)
@@ -335,8 +337,10 @@ static void getleader(sqlite3 *db, int64_t *uid_out, int64_t *points_out) {
 static void tree_handler(struct request *req, struct response *res, sqlite3 *db) {
 	(void)req;
 	sqlite3_stmt *q;
-	int64_t leaderuid;
-	getleader(db, &leaderuid, NULL);
+	sqlite3_stmt *q2;
+	int64_t leaderuid, secondplaceuid;
+	get_nth_leader(db, 0, &leaderuid, NULL);
+	get_nth_leader(db, 1, &secondplaceuid, NULL);
 
 	sql_prepare(db, STR("SELECT caseid FROM user WHERE rowid = ?;"), &q);
 	sql_bind_int64(q, 1, leaderuid);
@@ -344,9 +348,21 @@ static void tree_handler(struct request *req, struct response *res, sqlite3 *db)
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t leadercaseid = sql_column_str(q, 0);
 
-	render_html(res, tree, .leadercaseid = leadercaseid);
+	sql_prepare(db, STR("SELECT caseid FROM user WHERE rowid = ?;"), &q2);
+	sql_bind_int64(q2, 1, secondplaceuid);
+	if (sqlite3_step(q2) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t secondplacecaseid = sql_column_str(q2, 0);
+
+	render_html(
+		res,
+		tree,
+		.leadercaseid = leadercaseid,
+		.secondplacecaseid = secondplacecaseid,
+	);
 
 	sqlite3_finalize(q);
+	sqlite3_finalize(q2);
 }
 
 static void treedata_handler(struct request *req, struct response *res, sqlite3 *db) {
@@ -359,6 +375,7 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	sqlite3_stmt *q = NULL;
 	sqlite3_stmt *recents_q = NULL;
 	sqlite3_stmt *leader_q = NULL;
+	sqlite3_stmt *leader_q2 = NULL;
 
 	sql_prepare(
 		db,
@@ -387,9 +404,10 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 	str_t invitercaseid = sql_column_str(recents_q, 2);
 	str_t invitername = sql_column_str(recents_q, 3);
 
-	int64_t leaderuid;
-	int64_t leaderpoints;
-	getleader(db, &leaderuid, &leaderpoints);
+	int64_t leaderuid, secondplaceuid;
+	int64_t leaderpoints, secondplacepoints;
+	get_nth_leader(db, 0, &leaderuid, &leaderpoints);
+	get_nth_leader(db, 1, &secondplaceuid, &secondplacepoints);
 	sql_prepare(
 		db,
 		STR("SELECT caseid, fullname FROM user WHERE rowid = ?;"),
@@ -400,6 +418,17 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
 	str_t leadercaseid = sql_column_str(leader_q, 0);
 	str_t leadername = sql_column_str(leader_q, 1);
+
+	sql_prepare(
+		db,
+		STR("SELECT caseid, fullname FROM user WHERE rowid = ?;"),
+		&leader_q2
+	);
+	sql_bind_int64(leader_q2, 1, secondplaceuid);
+	if (sqlite3_step(leader_q2) != SQLITE_ROW)
+		errx(1, "[%s:%d] %s", __func__, __LINE__, sqlite3_errmsg(db));
+	str_t secondplacecaseid = sql_column_str(leader_q2, 0);
+	str_t secondplacename = sql_column_str(leader_q2, 1);
 
 	int64_t my_nstud, my_nfac, my_nkaler;
 	int64_t g_nstud, g_nfac, g_nkaler;
@@ -426,10 +455,14 @@ static void index_handler(struct request *req, struct response *res, sqlite3 *db
 		.leadercaseid = leadercaseid,
 		.leadername = leadername,
 		.leaderpoints = leaderpoints,
+		.secondplacecaseid = secondplacecaseid,
+		.secondplacename = secondplacename,
+		.secondplacepoints = secondplacepoints,
 	);
 	sqlite3_finalize(q);
 	sqlite3_finalize(recents_q);
 	sqlite3_finalize(leader_q);
+	sqlite3_finalize(leader_q2);
 }
 
 static void welcome_handler(struct request *req, struct response *res, sqlite3 *db) {
